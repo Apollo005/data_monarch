@@ -52,7 +52,7 @@ def clean_header_xlsx(content):
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     
-    if file.filename.endswith(('.csv', '.xlsx')) :
+    if file.filename.endswith(('.csv', '.xlsx', '.json')) :
         try:
             content_bytes = await file.read()
 
@@ -69,8 +69,12 @@ async def upload_file(file: UploadFile = File(...)):
                 skip_rows = clean_header_xlsx(content_bytes)
                 df = pd.read_excel(io.BytesIO(content_bytes), skiprows=skip_rows)
                 print('xlsx')
-            #add json data upload functionality soon...
-                
+
+            #add json data upload functionality - don't need to check for extra header info
+            elif file.filename.endswith('.json') :
+                content_str = content_bytes.decode("utf-8")
+                df = pd.read_json(content_str)
+
             df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 
         except Exception as e:
