@@ -62,25 +62,37 @@ async def upload_file(file: UploadFile = File(...)):
                 content_str = content_bytes.decode("utf-8")
                 #if there are extra rows that need to be skipped this will do that
                 skip_rows = clean_header_csv(content_str)
-                df = pd.read_csv(io.StringIO(content_str), skiprows=skip_rows)
+                df = pd.read_csv(io.StringIO(content_str), skiprows=skip_rows, parse_dates=True)
                 print('csv')
 
             #check if the file is a excel data file
             elif file.filename.endswith('.xlsx') :
                 skip_rows = clean_header_xlsx(content_bytes)
-                df = pd.read_excel(io.BytesIO(content_bytes), skiprows=skip_rows)
+                df = pd.read_excel(io.BytesIO(content_bytes), skiprows=skip_rows, parse_dates=True)
                 print('xlsx')
 
             #add json data upload functionality - don't need to check for extra header info
             elif file.filename.endswith('.json') :
                 content_str = content_bytes.decode("utf-8")
-                df = pd.read_json(content_str)
+                df = pd.read_json(content_str, convert_dates=True)
 
             df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
+            
+            #convert to records (list of dicts)
+            records = df.replace({pd.NaT: None}).to_dict('records')
+            
+            #process each record to ensure all values are JSON serializable
+            for record in records:
+                for key, value in record.items():
+                    if isinstance(value, pd.Timestamp):
+                        record[key] = value.strftime('%Y-%m-%d')
+                    elif pd.isna(value):
+                        record[key] = None
+            
+            return JSONResponse({"message": "File processed", "data": records})
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error processing {file.filename}: {str(e)}")
     else :
         raise HTTPException(status_code=415, detail=f"Unsupported file type for {file.filename}")
     # return {"message": "File received"}
-    return JSONResponse({"message": "File processed", "data": df.to_dict()})
