@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import datetime as dt
+import pdfplumber
 import matplotlib.pyplot as plt
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from typing import Union
@@ -53,7 +54,7 @@ def clean_header_xlsx(content):
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     
-    if file.filename.endswith(('.csv', '.xlsx', '.json')) :
+    if file.filename.endswith(('.csv', '.xlsx', '.json', '.pdf')) :
         try:
             content_bytes = await file.read()
 
@@ -75,6 +76,51 @@ async def upload_file(file: UploadFile = File(...)):
             elif file.filename.endswith('.json') :
                 content_str = content_bytes.decode("utf-8")
                 df = pd.read_json(content_str, convert_dates=True)
+
+            elif file.filename.endswith('.pdf') :
+                with pdfplumber.open(io.BytesIO(content_bytes)) as pdf :
+                    all_data = []
+                    for page in pdf.pages:
+
+                        tables = page.extract_tables()
+                        
+                        #if no tables found or empty tables, try other settings
+                        if not tables or all(len(table) == 0 for table in tables):
+                            tables = page.extract_tables({
+                                "vertical_strategy": "text", 
+                                "horizontal_strategy": "text",
+                                "snap_tolerance": 5,
+                                "join_tolerance": 3
+                            })
+                                                
+                        for table in tables:
+
+                            if table and len(table) > 0:
+                                print(f"Sample row: {table[0]}")
+                            all_data.extend(table)
+                # Only proceed if we have data
+                if all_data and len(all_data) > 0:
+                    df = pd.DataFrame(all_data)
+                    
+                    #set first row as column headers only if it contains non-empty values
+                    if df.shape[0] > 0 and not df.iloc[0].isna().all():
+                        header = df.iloc[0]
+                        df.columns = [str(col) if col else f"Column_{i}" for i, col in enumerate(header)]
+                        df = df[1:].reset_index(drop=True)
+                        
+                        #remove any rows that match the header row (removes repeated headers)
+                        df = df[~df.apply(lambda row: row.tolist() == header.tolist(), axis=1)]
+                else:
+                    #if no table data was extracted, try extracting text by page instead
+                    print("No table data found, extracting text")
+                    text_data = []
+                    for page in pdf.pages:
+                        text = page.extract_text()
+                        if text:
+                            lines = text.split('\n')
+                            text_data.extend([[line] for line in lines if line.strip()])
+                    
+                    df = pd.DataFrame(text_data)
 
             df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
             
