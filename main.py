@@ -43,6 +43,25 @@ def clean_header_xlsx(content):
         
     return 0
 
+def extract_table_from_txt(content):
+    lines = content.split("\n")
+
+    table_lines = [line.strip() for line in lines if "|" in line and any(char.isdigit() for char in line)]
+
+    if not table_lines:
+        return None
+
+    columns = [col.strip() for col in table_lines[0].split("|") if col.strip()]
+
+    data = []
+    for line in table_lines[1:]:
+        values = [val.strip() for val in line.split("|") if val.strip()]
+        if len(values) == len(columns):
+            data.append(values)
+
+    df = pd.DataFrame(data, columns=columns)
+    return df
+
 
 # example of the skip header functionality:
 # file_path = "/Users/adity1/Desktop/Climate 323/Lab01/CSRB_20040716.csv"
@@ -54,7 +73,7 @@ def clean_header_xlsx(content):
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     
-    if file.filename.endswith(('.csv', '.xlsx', '.json', '.pdf')) :
+    if file.filename.endswith(('.csv', '.xlsx', '.json', '.pdf', '.txt')) :
         try:
             content_bytes = await file.read()
 
@@ -77,6 +96,7 @@ async def upload_file(file: UploadFile = File(...)):
                 content_str = content_bytes.decode("utf-8")
                 df = pd.read_json(content_str, convert_dates=True)
 
+            #.pdf data extraction needs more work ########
             elif file.filename.endswith('.pdf') :
                 with pdfplumber.open(io.BytesIO(content_bytes)) as pdf :
                     all_data = []
@@ -121,6 +141,13 @@ async def upload_file(file: UploadFile = File(...)):
                             text_data.extend([[line] for line in lines if line.strip()])
                     
                     df = pd.DataFrame(text_data)
+            #.txt data extraction needs more work ###########
+            elif file.filename.endswith('.txt') :
+                content_str = content_bytes.decode("utf-8")
+                df = extract_table_from_txt(content_str)
+
+                if df is None or df.empty:
+                    raise HTTPException(status_code=400, detail="No valid tables found in TXT file.")
 
             df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
             
