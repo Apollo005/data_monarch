@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, FileResponse
 app = FastAPI()
 
 #testing the app
-
+print("hi")
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
