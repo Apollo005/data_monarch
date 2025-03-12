@@ -9,7 +9,7 @@ import io
 from fastapi.responses import JSONResponse, FileResponse
 
 app = FastAPI()
-
+print("hi")
 #testing the app
 
 @app.get("/")
