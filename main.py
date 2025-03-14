@@ -159,8 +159,10 @@ async def upload_file(file: UploadFile = File(...)):
 
                     #convert space-separated values into a structured DataFrame
                     data = [line.split() for line in lines if len(line.split()) > 1]
+
                     #make this user input afterwards and check for column-data imbalance
-                    column_names = ["Year", "Month", "Decimal_Date", "Average", "Interpolated", "Trend", "Days"]
+                    #default error message is "error processing solar_flux.txt: 7 columns passed, passed data had 5 columns"
+                    column_names = ["Year", "HH:mm", " value ", "qualifier", "description"]
                     df = pd.DataFrame(data, columns=column_names)
 
                 df = df.apply(pd.to_numeric, errors='ignore')
