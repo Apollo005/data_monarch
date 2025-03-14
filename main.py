@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, FileResponse
 app = FastAPI()
 
 #testing the app
-print("hi")
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
@@ -60,6 +60,11 @@ def extract_table_from_txt(content):
             data.append(values)
 
     df = pd.DataFrame(data, columns=columns)
+    return df
+
+#mainly for text files
+def remove_text_after_char(df, char) :
+    df = df.map(lambda x: x.split(char, 1)[0] if isinstance(x, str) and char in x else x)
     return df
 
 
@@ -146,11 +151,21 @@ async def upload_file(file: UploadFile = File(...)):
                 content_str = content_bytes.decode("utf-8")
                 df = extract_table_from_txt(content_str)
 
-                if df is None or df.empty:
-                    raise HTTPException(status_code=400, detail="No valid tables found in TXT file.")
+                if df is None:
+                    lines = content_str.split("\n")
+
+                    #remove empty lines and comments
+                    lines = [line.split("#", 1)[0].strip() for line in lines if line.strip()]
+
+                    #convert space-separated values into a structured DataFrame
+                    data = [line.split() for line in lines if len(line.split()) > 1]
+                    column_names = ["Year", "Month", "Decimal_Date", "Average", "Interpolated", "Trend", "Days"]
+                    df = pd.DataFrame(data, columns=column_names)
+
+                df = df.apply(pd.to_numeric, errors='ignore')
+                df = df.dropna().reset_index(drop=True)
 
             df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
-            
             #convert to records (list of dicts)
             records = df.replace({pd.NaT: None}).to_dict('records')
             
