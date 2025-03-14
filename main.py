@@ -159,6 +159,7 @@ async def upload_file(file: UploadFile = File(...)):
 
                     #convert space-separated values into a structured DataFrame
                     data = [line.split() for line in lines if len(line.split()) > 1]
+                    #make this user input afterwards and check for column-data imbalance
                     column_names = ["Year", "Month", "Decimal_Date", "Average", "Interpolated", "Trend", "Days"]
                     df = pd.DataFrame(data, columns=column_names)
 
