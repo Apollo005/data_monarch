@@ -7,8 +7,18 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from typing import Union
 import io
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# Enable CORS to allow requests from React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 #testing the app
 
@@ -78,7 +88,7 @@ def remove_text_after_char(df, char) :
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     
-    if file.filename.endswith(('.csv', '.xlsx', '.json', '.pdf', '.txt')) :
+    if file.filename.endswith(('.csv', '.xlsx', '.json', '.pdf', '.txt', '.jsonl')) :
         try:
             content_bytes = await file.read()
 
@@ -100,7 +110,12 @@ async def upload_file(file: UploadFile = File(...)):
             elif file.filename.endswith('.json') :
                 content_str = content_bytes.decode("utf-8")
                 df = pd.read_json(content_str, convert_dates=True)
-
+            
+            #ad jsonl file upload functionality
+            elif file.filename.endswith('.jsonl') :
+                content_str = content_bytes.decode("utf-8")
+                df = pd.read_json(content_str, convert_dates=True, lines=True)
+                
             #.pdf data extraction needs more work ########
             elif file.filename.endswith('.pdf') :
                 with pdfplumber.open(io.BytesIO(content_bytes)) as pdf :
