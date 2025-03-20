@@ -19,13 +19,13 @@ data_frame = pd.DataFrame()
 #work with this later to figure out file size checks
 FILE_SIZE_THRESHOLD = 10 * 1024 * 1024
 
-# Enable CORS to allow requests from React frontend
+#enable CORS to allow requests from React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend URL
+    allow_origins=["http://localhost:3000"],  #react frontend URL
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],  #allow all HTTP methods
+    allow_headers=["*"],  #allow all headers
 )
 
 #testing the app
