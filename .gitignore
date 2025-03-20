@@ -1,0 +1,16 @@
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore virtual environments and dependencies
+/venv/
+/env/
+lib/python3.11/site-packages/
+
+# Ignore other build files and system files
+*.log
+*.bak
+*.swp
