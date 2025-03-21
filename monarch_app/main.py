@@ -15,7 +15,6 @@ from sqlalchemy.ext.declarative import declarative_base
 
 app = FastAPI()
 
-print("hi")
     
 def create_table_from_df(df, table_name, cursor):
     # Optionally reset index and add a primary key column if desired:
