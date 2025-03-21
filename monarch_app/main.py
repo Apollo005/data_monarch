@@ -3,18 +3,49 @@ import numpy as np
 import datetime as dt
 import pdfplumber
 import matplotlib.pyplot as plt
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect
 from typing import Union
 import io
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import WebSocket, WebSocketDisconnect
 from codes.filter import filter_data
+from sqlalchemy import create_engine, Table, Column, Integer, String, Date, Float, text, inspect
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 
 app = FastAPI()
 
-#overall data frame to store uploaded data into
-data_frame = pd.DataFrame()
+    
+def create_table_from_df(df, table_name, cursor):
+    # Optionally reset index and add a primary key column if desired:
+    df.reset_index(drop=True, inplace=True)
+    df.insert(0, 'Index', range(1, len(df) + 1))
+    
+    # Start building column definitions (you can exclude the index if not needed)
+    col_defs = ['"Index" serial primary key']
+    for col in df.columns:
+        if col != 'Index':  # Skip the auto-index column
+            if pd.api.types.is_integer_dtype(df[col]):
+                col_type = 'integer'
+            elif pd.api.types.is_float_dtype(df[col]):
+                col_type = 'double precision'
+            elif pd.api.types.is_datetime64_any_dtype(df[col]):
+                col_type = 'timestamp without time zone'
+            else:
+                col_type = 'text'
+            col_defs.append(f'"{col}" {col_type}')
+    
+    create_table_query = f"""
+    DROP TABLE IF EXISTS {table_name};
+    CREATE TABLE {table_name} (
+        {', '.join(col_defs)}
+    );
+    """
+    cursor.execute(create_table_query)
+
+#initialize a database to store the current datatable in:
+DATABASE_URL = "postgresql://monarch:Ganesha$11@localhost:5432/data_monarch"
+engine = create_engine(DATABASE_URL, echo=True)
 
 #work with this later to figure out file size checks
 FILE_SIZE_THRESHOLD = 10 * 1024 * 1024
@@ -33,12 +64,6 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
-
-# @app.get("/items/{item_id}")
-# def read_item(item_id: int, q: str):
-#     return {"item_id": item_id, "q": q}
-
-#drawback of cleaning functions is it only checks for the first row that has the same # of cols as the max number of cols in the dataset
 
 def clean_header_csv(content):
     lines = content.split("\n")
@@ -187,8 +212,6 @@ async def upload_file(file: UploadFile = File(...)):
             df = df.replace({pd.NaT: None})
             #convert to records (list of dicts)
             records = df.to_dict('records')
-            #store dataframe:
-            data_frame = df
             
             #process each record to ensure all values are JSON serializable
             for record in records:
@@ -197,7 +220,25 @@ async def upload_file(file: UploadFile = File(...)):
                         record[key] = value.strftime('%Y-%m-%d')
                     elif pd.isna(value):
                         record[key] = None
-            
+            print(df)
+            #create table based on df
+            table_name = 'localytics_app2'
+            connection = engine.raw_connection()
+            cursor = connection.cursor()
+            create_table_from_df(df, table_name, cursor)
+            connection.commit()
+
+            #stream data into PostgreSQL using COPY
+            output = io.StringIO()
+            df.to_csv(output, sep='\t', header=False, index=False)
+            output.seek(0)
+
+            #copy_from to bulk load data
+            cursor.copy_from(output, table_name, null="")    
+            connection.commit()
+            cursor.close()
+            connection.close()
+
             return JSONResponse({"message": "File processed", "data": records})
 
         except Exception as e:
