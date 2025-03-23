@@ -12,16 +12,32 @@ from codes.filter import filter_data
 from sqlalchemy import create_engine, Table, Column, Integer, String, Date, Float, text, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+import re
+import time
 
 app = FastAPI()
 
-    
+def sanitize_table_name(file_name: str) -> str:
+    #remove any non-alphabetic characters, replace spaces with underscores, and ensure it's not too long
+    sanitized_name = re.sub(r'\W|^(?=\d)', '_', file_name)
+    return sanitized_name[:63]
+
+def check_if_table_exists(cursor, table_name: str) -> bool:
+    cursor.execute(f"""
+    SELECT EXISTS (
+        SELECT 1 
+        FROM information_schema.tables 
+        WHERE table_name = '{table_name}'
+    );
+    """)
+    return cursor.fetchone()[0]
+
 def create_table_from_df(df, table_name, cursor):
-    # Optionally reset index and add a primary key column if desired:
+    #reset index and add a primary key column if desired:
     df.reset_index(drop=True, inplace=True)
     df.insert(0, 'Index', range(1, len(df) + 1))
     
-    # Start building column definitions (you can exclude the index if not needed)
+    #start building column definitions (you can exclude the index if not needed)
     col_defs = ['"Index" serial primary key']
     for col in df.columns:
         if col != 'Index':  # Skip the auto-index column
@@ -220,11 +236,20 @@ async def upload_file(file: UploadFile = File(...)):
                         record[key] = value.strftime('%Y-%m-%d')
                     elif pd.isna(value):
                         record[key] = None
-            print(df)
+
             #create table based on df
-            table_name = 'localytics_app2'
+            base_table_name = sanitize_table_name(file.filename.rsplit('.', 1)[0])
+            base_table_name = base_table_name.lower()
+            table_name = base_table_name.lower()
+
             connection = engine.raw_connection()
             cursor = connection.cursor()
+
+            suffix_counter = 1
+            while check_if_table_exists(cursor, table_name):
+                table_name = f"{base_table_name}_{suffix_counter}"
+                suffix_counter += 1
+
             create_table_from_df(df, table_name, cursor)
             connection.commit()
 
