@@ -22,6 +22,24 @@ def sanitize_table_name(file_name: str) -> str:
     sanitized_name = re.sub(r'\W|^(?=\d)', '_', file_name)
     return sanitized_name[:63]
 
+def sanitize_string_input(value):
+    #clean up strings to replace newlines and extra spaces
+    if isinstance(value, str):
+        # Replace newlines with spaces, remove extra spaces, and strip leading/trailing spaces
+        sanitized_value = " ".join(value.split())
+        return sanitized_value
+    return value
+
+def sanitize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    df.columns = [sanitize_string_input(col) for col in df.columns]
+
+    # Sanitize cell values
+    for col in df.columns:
+        if df[col].dtype == 'object':  # Apply sanitization only to string columns
+            df[col] = df[col].apply(sanitize_string_input)
+    
+    return df
+
 def check_if_table_exists(cursor, table_name: str) -> bool:
     cursor.execute(f"""
     SELECT EXISTS (
@@ -40,15 +58,22 @@ def create_table_from_df(df, table_name, cursor):
     #start building column definitions (you can exclude the index if not needed)
     col_defs = ['"Index" serial primary key']
     for col in df.columns:
-        if col != 'Index':  # Skip the auto-index column
-            if pd.api.types.is_integer_dtype(df[col]):
+        if col != 'Index':  # Skip the auto-index column, add bool
+            if pd.api.types.is_integer_dtype(df[col]) and df[col].notnull().all():
                 col_type = 'integer'
-            elif pd.api.types.is_float_dtype(df[col]):
+                print(col_type)
+            elif pd.api.types.is_float_dtype(df[col]) and df[col].notnull().all():
                 col_type = 'double precision'
+                print(col_type)
             elif pd.api.types.is_datetime64_any_dtype(df[col]):
                 col_type = 'timestamp without time zone'
+                print(col_type)
+            elif pd.api.types.is_object_dtype(df[col]):
+                col_type = 'text'
+                print(col_type)
             else:
                 col_type = 'text'
+                print(col_type, "2")
             col_defs.append(f'"{col}" {col_type}')
     
     create_table_query = f"""
@@ -226,6 +251,9 @@ async def upload_file(file: UploadFile = File(...)):
 
             df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
             df = df.replace({pd.NaT: None})
+            
+            df = sanitize_dataframe(df)
+
             #convert to records (list of dicts)
             records = df.to_dict('records')
             
