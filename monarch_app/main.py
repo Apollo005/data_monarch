@@ -1,19 +1,5 @@
-import pandas as pd
-import numpy as np
-import datetime as dt
-import pdfplumber
-import matplotlib.pyplot as plt
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect
-from typing import Union
-import io
-from fastapi.responses import JSONResponse, FileResponse
-from fastapi.middleware.cors import CORSMiddleware
+from imports import *
 from codes.filter import filter_data
-from sqlalchemy import create_engine, Table, Column, Integer, String, Date, Float, text, inspect
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-import re
-import time
 
 app = FastAPI()
 
@@ -85,7 +71,8 @@ def create_table_from_df(df, table_name, cursor):
     cursor.execute(create_table_query)
 
 #initialize a database to store the current datatable in:
-DATABASE_URL = "postgresql://monarch:Ganesha$11@localhost:5432/data_monarch"
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL, echo=True)
 
 #work with this later to figure out file size checks
@@ -299,19 +286,3 @@ async def upload_file(file: UploadFile = File(...)):
     else :
         raise HTTPException(status_code=415, detail=f"Unsupported file type for {file.filename}")
     # return {"message": "File received"}
-
-#next part of the pipeline to implement a websocket for real time changes to the data:
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            # Listen for messages (e.g., filter parameters) from the frontend
-            message = await websocket.receive_text()
-            
-            # Here you would filter data based on the message received (e.g., filter params)
-            # You can also send updates when new data is processed
-            # filtered_data = filter_data_logic(message)  # Implement your filtering logic
-            # await websocket.send_text(str(filtered_data))  # Send filtered data back to the client
-    except WebSocketDisconnect:
-        print("Client disconnected")

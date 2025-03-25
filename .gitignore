@@ -14,3 +14,4 @@ lib/python3.11/site-packages/
 *.log
 *.bak
 *.swp
+.env
