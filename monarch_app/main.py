@@ -1,7 +1,9 @@
-from imports import *
+from codes.imports import *
 from codes.filter import filter_data
+from codes.auth import router as auth_router
 
 app = FastAPI()
+app.include_router(auth_router)
 
 def sanitize_table_name(file_name: str) -> str:
     #remove any non-alphabetic characters, replace spaces with underscores, and ensure it's not too long
