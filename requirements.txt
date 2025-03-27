@@ -8,3 +8,4 @@ psycopg2==2.9.3
 python-dotenv==0.21.0
 passlib==1.7.4
 pydantic==1.10.2
+bcrypt == 4.3.0
