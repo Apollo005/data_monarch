@@ -141,7 +141,7 @@ def remove_text_after_char(df, char) :
     df = df.map(lambda x: x.split(char, 1)[0] if isinstance(x, str) and char in x else x)
     return df
 
-@app.post("/upload/")
+@app.post("/api/data/upload/")
 async def upload_file(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)

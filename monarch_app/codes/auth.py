@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 import jwt
 from fastapi.security import OAuth2PasswordBearer
 
-#change this later to be not an in mem db
 load_dotenv()
 DATABASE_URL = os.getenv("USER_DATABASE_URL")
 engine = create_engine(DATABASE_URL, echo=True)
@@ -75,7 +74,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     return {"message": "User registered successfully"}
 
 #login an existing user
-@router.post("/login")
+@router.post("/api/auth/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == form_data.username).first()
     if not db_user or not pwd_context.verify(form_data.password, db_user.password):

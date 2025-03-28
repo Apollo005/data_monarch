@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import DataTable from "./DataTable";
+import config from './config';
 
 const FileUpload = () => {
   const [file, setFile] = useState(null);
@@ -28,7 +29,7 @@ const FileUpload = () => {
     formData.append("file", file);
 
     try {
-      const response = await axios.post("http://localhost:8000/upload/", formData, {
+      const response = await axios.post(`${config.baseUrl}/api/data/upload`, formData, {
         headers: { 
           "Content-Type": "multipart/form-data",
           "Authorization": `Bearer ${token}`

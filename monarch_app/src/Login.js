@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import config from './config';
 
 const Login = ({ onLogin, onLogout, isAuthenticated }) => {
   const [username, setUsername] = useState("");
@@ -22,7 +23,7 @@ const Login = ({ onLogin, onLogout, isAuthenticated }) => {
     formData.append("password", password);
 
     try {
-      const res = await fetch("http://localhost:8000/login", {
+      const res = await fetch(`${config.baseUrl}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
