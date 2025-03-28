@@ -1,6 +1,7 @@
 from codes.imports import *
 from codes.filter import filter_data
-from codes.auth import router as auth_router
+from codes.auth import router as auth_router, get_current_user
+from codes.tables import User
 
 app = FastAPI()
 app.include_router(auth_router)
@@ -141,7 +142,10 @@ def remove_text_after_char(df, char) :
     return df
 
 @app.post("/upload/")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
     
     if file.filename.endswith(('.csv', '.xlsx', '.json', '.pdf', '.txt', '.jsonl')) :
         try:

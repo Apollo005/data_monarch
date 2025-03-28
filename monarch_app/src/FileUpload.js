@@ -18,19 +18,32 @@ const FileUpload = () => {
       return;
     }
 
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setMessage("Please log in to upload files");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("file", file);
 
     try {
       const response = await axios.post("http://localhost:8000/upload/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { 
+          "Content-Type": "multipart/form-data",
+          "Authorization": `Bearer ${token}`
+        },
       });
 
       setMessage("Upload successful!");
       setFileData(response.data.data);
       console.log(response.data);  //log server response
     } catch (error) {
-      setMessage("Upload failed");
+      if (error.response?.status === 401) {
+        setMessage("Session expired. Please log in again.");
+      } else {
+        setMessage("Upload failed");
+      }
       console.error("Error uploading file:", error);
     }
   };
@@ -45,7 +58,5 @@ const FileUpload = () => {
     </div>
   );
 };
-
-
 
 export default FileUpload;
