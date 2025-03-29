@@ -1,6 +1,6 @@
 from utils.imports import *
 from database.tables import User
-from database.database import SessionLocal
+from database.users import SessionLocal
 from datetime import datetime, timedelta
 import jwt
 from fastapi.security import OAuth2PasswordBearer
