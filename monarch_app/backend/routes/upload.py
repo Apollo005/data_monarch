@@ -1,19 +1,30 @@
 from utils.imports import *
-from database.tables import User
+from database.tables import User, File as DBFile
 from routes.auth import get_current_user
-from database.files import engine
+from database.files import engine as data_engine
+from database.users import SessionLocal
 from utils.clean_head import clean_header_csv, clean_header_xlsx
 from utils.sanitize import sanitize_table_name, sanitize_dataframe
 from utils.db_helpers import check_if_table_exists, create_table_from_df
 from utils.text_extract import extract_table_from_txt
-
+from sqlalchemy.orm import Session
+from fastapi import File, UploadFile
+from sqlalchemy.exc import SQLAlchemyError
 
 router = APIRouter()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 @router.post("/api/data/upload/")
 async def upload_file(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     
     if file.filename.endswith(('.csv', '.xlsx', '.json', '.pdf', '.txt', '.jsonl')) :
@@ -132,7 +143,7 @@ async def upload_file(
             base_table_name = base_table_name.lower()
             table_name = base_table_name.lower()
 
-            connection = engine.raw_connection()
+            connection = data_engine.raw_connection()
             cursor = connection.cursor()
 
             suffix_counter = 1
@@ -154,7 +165,27 @@ async def upload_file(
             cursor.close()
             connection.close()
 
-            return JSONResponse({"message": "File processed", "data": records})
+            try:
+                # Store file information in the database
+                file_type = file.filename.split('.')[-1].lower()
+                new_file = DBFile(
+                    filename=file.filename,
+                    file_path=table_name,
+                    file_type=file_type,
+                    user_id=current_user.id
+                )
+                db.add(new_file)
+                db.commit()
+                db.refresh(new_file)
+
+                return JSONResponse({
+                    "message": "File processed",
+                    "data": records,
+                    "file_id": new_file.id
+                })
+            except SQLAlchemyError as e:
+                db.rollback()
+                raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error processing {file.filename}: {str(e)}")

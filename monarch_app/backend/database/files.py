@@ -2,7 +2,7 @@ import os
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
-#initialize a database to store the current datatable in:
+# Initialize database for storing data tables
 load_dotenv()
-DATABASE_URL = os.getenv("DATA_DATABASE_URL")
-engine = create_engine(DATABASE_URL, echo=True)
+DATA_DATABASE_URL = os.getenv("DATA_DATABASE_URL")
+engine = create_engine(DATA_DATABASE_URL, echo=True) 

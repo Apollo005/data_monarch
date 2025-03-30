@@ -2,11 +2,12 @@ from utils.imports import *
 from models.filter import filter_data
 from routes.auth import router as auth_router
 from routes.upload import router as upload_router
-from database.tables import User
+from routes.files import router as files_router
 
 app = FastAPI()
 app.include_router(auth_router)
 app.include_router(upload_router)
+app.include_router(files_router)
 
 #enable CORS to allow requests from React frontend
 app.add_middleware(
