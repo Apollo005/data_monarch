@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import FileUpload from "./FileUpload";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./Login";
+import Dashboard from "./Dashboard";
+import './styles/global.css';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -11,23 +13,46 @@ function App() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    localStorage.removeItem("token");
+  };
+
+  // Protected Route component
+  const ProtectedRoute = ({ children }) => {
+    if (!isAuthenticated) {
+      return <Navigate to="/login" />;
+    }
+    return children;
   };
 
   return (
-    <div className="App" style={{ padding: "2rem" }}>
-      <h1>Data Monarch Portal</h1>
-      <Login 
-        onLogin={handleLogin}
-        onLogout={handleLogout}
-        isAuthenticated={isAuthenticated}
-      />
-      <hr />
-      {isAuthenticated ? (
-        <FileUpload />
-      ) : (
-        <p>Please log in to access the file upload feature.</p>
-      )}
-    </div>
+    <Router>
+      <div className="App">
+        <Routes>
+          <Route 
+            path="/login" 
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            } 
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard onLogout={handleLogout} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/"
+            element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />}
+          />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 

@@ -6,24 +6,26 @@ const DataTable = ({ data }) => {
   const keys = Object.keys(data[0]);
 
   return (
-    <table border="1" style={{ width: "100%", marginTop: "20px" }}>
-      <thead>
-        <tr>
-          {keys.map((key) => (
-            <th key={key}>{key}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((row, index) => (
-          <tr key={index}>
+    <div className="table-container">
+      <table className="table">
+        <thead>
+          <tr>
             {keys.map((key) => (
-              <td key={key}>{row[key]}</td>
+              <th key={key}>{key}</th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {data.map((row, index) => (
+            <tr key={index}>
+              {keys.map((key) => (
+                <td key={key}>{row[key]}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 };
 

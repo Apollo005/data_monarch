@@ -26,7 +26,7 @@ class FileResponse(BaseModel):
     class Config:
         from_attributes = True
 
-@router.get("/api/files/", response_model=List[FileResponse])
+@router.get("/api/files", response_model=List[FileResponse])
 async def get_user_files(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

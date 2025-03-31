@@ -1,15 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import axios from "axios";
 import DataTable from "./DataTable";
 import config from './config';
 
-const FileUpload = () => {
+const FileUpload = ({ onDataUpload, existingData }) => {
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
-  const [fileData, setFileData] = useState(null);
+  const [fileData, setFileData] = useState(existingData);
+  const fileInputRef = useRef(null);
 
   const handleFileChange = (event) => {
-    setFile(event.target.files[0]);  //store selected file
+    const selectedFile = event.target.files[0];
+    setFile(selectedFile);
   };
 
   const handleUpload = async (event) => {
@@ -38,7 +40,7 @@ const FileUpload = () => {
 
       setMessage("Upload successful!");
       setFileData(response.data.data);
-      console.log(response.data);  //log server response
+      onDataUpload(response.data.data);
     } catch (error) {
       if (error.response?.status === 401) {
         setMessage("Session expired. Please log in again.");
@@ -50,12 +52,54 @@ const FileUpload = () => {
   };
 
   return (
-    <div className="file-upload">
-      <h2>Upload a File</h2>
-      <input type="file" onChange={handleFileChange} />
-      <button onClick={handleUpload}>Upload</button>
-      <p>{message}</p>
-      {fileData && <DataTable data={fileData} />}
+    <div className="file-upload-container">
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <h2 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>Upload a File</h2>
+        
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '1rem',
+          marginBottom: '1rem'
+        }}>
+          <div className="file-input-wrapper" style={{ flex: 1 }}>
+            <input
+              type="file"
+              onChange={handleFileChange}
+              ref={fileInputRef}
+              id="file-input"
+            />
+            <label htmlFor="file-input" className="file-input-label">
+              Choose File
+            </label>
+            {file && <span className="file-name">{file.name}</span>}
+          </div>
+
+          <button 
+            onClick={handleUpload}
+            className="btn btn-primary"
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            Upload
+          </button>
+        </div>
+
+        {message && (
+          <p style={{ 
+            color: message.includes("failed") || message.includes("expired") ? "var(--error)" : "var(--success)",
+            fontWeight: "500"
+          }}>
+            {message}
+          </p>
+        )}
+      </div>
+
+      {fileData && (
+        <div className="card">
+          <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Data Preview</h3>
+          <DataTable data={fileData} />
+        </div>
+      )}
     </div>
   );
 };

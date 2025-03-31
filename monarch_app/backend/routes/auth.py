@@ -12,7 +12,7 @@ engine = create_engine(DATABASE_URL, echo=True)
 # JWT Configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")  # Change this in production
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 20160
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
@@ -61,7 +61,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
 
 #new user register
 @router.post("/api/auth/register")
-def register(user: UserCreate, db: Session = Depends(get_db)):
+async def register(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already exists")
@@ -75,7 +75,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 #login an existing user
 @router.post("/api/auth/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == form_data.username).first()
     if not db_user or not pwd_context.verify(form_data.password, db_user.password):
         raise HTTPException(status_code=400, detail="Invalid username or password")
