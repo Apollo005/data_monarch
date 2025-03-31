@@ -40,6 +40,13 @@ const Sidebar = ({ onFileSelect }) => {
     onFileSelect(file);
   };
 
+  const handleNewUpload = () => {
+    // Reset the selected file
+    setSelectedFile(null);
+    // Call onFileSelect with null to indicate a new upload
+    onFileSelect(null);
+  };
+
   return (
     <aside style={{ 
       width: "300px", 
@@ -48,12 +55,46 @@ const Sidebar = ({ onFileSelect }) => {
       backgroundColor: "var(--white)",
       boxShadow: "2px 0 5px rgba(0, 0, 0, 0.05)"
     }}>
-      <h2 style={{ 
-        color: "var(--text-dark)",
-        marginBottom: "1.5rem",
-        fontSize: "1.5rem",
-        fontWeight: "600"
-      }}>My Uploaded Files</h2>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "1.5rem"
+      }}>
+        <h2 style={{ 
+          color: "var(--text-dark)",
+          fontSize: "1.5rem",
+          fontWeight: "600",
+          margin: 0
+        }}>My Uploaded Files</h2>
+        <button
+          onClick={handleNewUpload}
+          style={{
+            backgroundColor: "var(--primary-color)",
+            color: "var(--white)",
+            border: "none",
+            borderRadius: "50%",
+            width: "32px",
+            height: "32px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.backgroundColor = "var(--primary-color-dark)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.backgroundColor = "var(--primary-color)";
+          }}
+        >
+          <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>+</span>
+        </button>
+      </div>
       {error && <p style={{ color: "var(--error)", marginBottom: "1rem" }}>{error}</p>}
       {files.length > 0 ? (
         <ul style={{ 

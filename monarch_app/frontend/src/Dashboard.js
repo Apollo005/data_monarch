@@ -29,6 +29,14 @@ function Dashboard({ onLogout }) {
   };
 
   const handleFileSelect = async (file) => {
+    // If file is null, it means we want a new upload instance
+    if (file === null) {
+      setSelectedFile(null);
+      setUploadedData(null);
+      setActiveTab('upload');
+      return;
+    }
+
     setSelectedFile(file);
     setIsLoading(true);
     setError(null);
