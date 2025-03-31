@@ -22,17 +22,20 @@ class FileResponse(BaseModel):
     file_type: str
     created_at: datetime
     updated_at: datetime
+    user_id: int
 
     class Config:
         from_attributes = True
+        populate_by_name = True
+        orm_mode = True
 
 @router.get("/api/files", response_model=List[FileResponse])
 async def get_user_files(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    "Get all files associated with the current user"
-    files = db.query(File).filter(File.user_id == current_user.id).all()
+    """Get all files associated with the current user"""
+    files = db.query(File).filter(File.user_id == current_user.id).order_by(File.created_at.asc()).all()
     return files
 
 @router.get("/api/files/{file_id}", response_model=FileResponse)
@@ -41,7 +44,7 @@ async def get_file(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    "Get a specific file by ID (if owned by the current user)"
+    """Get a specific file by ID (if owned by the current user)"""
     file = db.query(File).filter(
         File.id == file_id,
         File.user_id == current_user.id

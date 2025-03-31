@@ -5,21 +5,21 @@ from routes.upload import router as upload_router
 from routes.files import router as files_router
 
 app = FastAPI()
-app.include_router(auth_router)
-app.include_router(upload_router)
-app.include_router(files_router)
 
 #enable CORS to allow requests from React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  #react frontend URL
+    allow_origins=["http://localhost:3000"],  # Specific origin for React frontend
     allow_credentials=True,
-    allow_methods=["*"],  #allow all HTTP methods
-    allow_headers=["*"],  #allow all headers
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
 )
 
-#testing the app
+app.include_router(auth_router)
+app.include_router(upload_router)
+app.include_router(files_router)
 
+#testing the app
 @app.get("/")
 def read_root():
     return {"Hello": "World"}

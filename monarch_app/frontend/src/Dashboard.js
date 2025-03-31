@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FileUpload from './FileUpload';
+import Sidebar from './SideBar';
+import ThemeToggle from './components/ThemeToggle';
 import './styles/global.css';
 
 function Dashboard({ onLogout }) {
@@ -175,7 +177,10 @@ function Dashboard({ onLogout }) {
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
         marginBottom: '2rem'
       }}>
-        <h2 style={{ color: 'var(--primary-color)', margin: 0 }}>Data Monarch</h2>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <h2 style={{ color: 'var(--primary-color)', margin: 0 }}>Data Monarch</h2>
+          <ThemeToggle />
+        </div>
         <button 
           onClick={handleLogout}
           className="btn btn-danger"
@@ -184,69 +189,72 @@ function Dashboard({ onLogout }) {
         </button>
       </nav>
 
-      <div className="container">
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          marginBottom: '2rem',
-          overflowX: 'auto',
-          paddingBottom: '0.5rem'
-        }}>
-          {tabs.map(tab => (
+      <div style={{ display: 'flex', gap: '2rem' }}>
+        <Sidebar />
+        <div className="container" style={{ flex: 1 }}>
+          <div style={{
+            display: 'flex',
+            gap: '1rem',
+            marginBottom: '2rem',
+            overflowX: 'auto',
+            paddingBottom: '0.5rem'
+          }}>
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="btn"
+                style={{
+                  backgroundColor: activeTab === tab.id ? 'var(--primary-color)' : 'var(--white)',
+                  color: activeTab === tab.id ? 'var(--white)' : 'var(--text-dark)',
+                  border: activeTab === tab.id ? 'none' : '1px solid var(--border-color)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="card">
+            {renderTabContent()}
+          </div>
+
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginTop: '2rem',
+            padding: '0 1rem'
+          }}>
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={handleBack}
               className="btn"
               style={{
-                backgroundColor: activeTab === tab.id ? 'var(--primary-color)' : 'var(--white)',
-                color: activeTab === tab.id ? 'var(--white)' : 'var(--text-dark)',
-                border: activeTab === tab.id ? 'none' : '1px solid var(--border-color)',
-                whiteSpace: 'nowrap'
+                backgroundColor: 'var(--white)',
+                color: 'var(--text-dark)',
+                border: '1px solid var(--border-color)',
+                opacity: currentTabIndex === 0 ? 0.5 : 1,
+                cursor: currentTabIndex === 0 ? 'not-allowed' : 'pointer'
               }}
+              disabled={currentTabIndex === 0}
             >
-              {tab.label}
+              ← Back
             </button>
-          ))}
-        </div>
-
-        <div className="card">
-          {renderTabContent()}
-        </div>
-
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          marginTop: '2rem',
-          padding: '0 1rem'
-        }}>
-          <button
-            onClick={handleBack}
-            className="btn"
-            style={{
-              backgroundColor: 'var(--white)',
-              color: 'var(--text-dark)',
-              border: '1px solid var(--border-color)',
-              opacity: currentTabIndex === 0 ? 0.5 : 1,
-              cursor: currentTabIndex === 0 ? 'not-allowed' : 'pointer'
-            }}
-            disabled={currentTabIndex === 0}
-          >
-            ← Back
-          </button>
-          <button
-            onClick={handleNext}
-            className="btn"
-            style={{
-              backgroundColor: 'var(--white)',
-              color: 'var(--text-dark)',
-              border: '1px solid var(--border-color)',
-              opacity: currentTabIndex === tabs.length - 1 ? 0.5 : 1,
-              cursor: currentTabIndex === tabs.length - 1 ? 'not-allowed' : 'pointer'
-            }}
-            disabled={currentTabIndex === tabs.length - 1}
-          >
-            Next →
-          </button>
+            <button
+              onClick={handleNext}
+              className="btn"
+              style={{
+                backgroundColor: 'var(--white)',
+                color: 'var(--text-dark)',
+                border: '1px solid var(--border-color)',
+                opacity: currentTabIndex === tabs.length - 1 ? 0.5 : 1,
+                cursor: currentTabIndex === tabs.length - 1 ? 'not-allowed' : 'pointer'
+              }}
+              disabled={currentTabIndex === tabs.length - 1}
+            >
+              Next →
+            </button>
+          </div>
         </div>
       </div>
     </div>
