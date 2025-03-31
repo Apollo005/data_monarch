@@ -6,6 +6,8 @@ const Sidebar = ({ onFileSelect }) => {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState(null);
 
   useEffect(() => {
     const fetchFiles = async () => {
@@ -45,6 +47,46 @@ const Sidebar = ({ onFileSelect }) => {
     setSelectedFile(null);
     // Call onFileSelect with null to indicate a new upload
     onFileSelect(null);
+  };
+
+  const handleDeleteClick = (file, event) => {
+    event.stopPropagation(); // Prevent file selection when clicking delete
+    setFileToDelete(file);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(`${config.baseUrl}/api/files/${fileToDelete.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        withCredentials: true
+      });
+
+      // Remove the file from the local state
+      setFiles(files.filter(f => f.id !== fileToDelete.id));
+      
+      // If the deleted file was selected, clear the selection
+      if (selectedFile?.id === fileToDelete.id) {
+        setSelectedFile(null);
+        onFileSelect(null);
+      }
+
+      setShowDeleteConfirm(false);
+      setFileToDelete(null);
+    } catch (err) {
+      setError("Failed to delete file. Please try again.");
+      console.error(err);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+    setFileToDelete(null);
   };
 
   return (
@@ -119,6 +161,7 @@ const Sidebar = ({ onFileSelect }) => {
                   : "1px solid var(--border-color)",
                 transition: "all 0.2s ease",
                 boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+                position: "relative",
                 ":hover": {
                   transform: "translateY(-2px)",
                   boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
@@ -156,8 +199,32 @@ const Sidebar = ({ onFileSelect }) => {
                 }}>📄</span>
                 <strong style={{ 
                   color: "var(--text-dark)",
-                  fontSize: "1rem"
+                  fontSize: "1rem",
+                  flex: 1
                 }}>{file.filename}</strong>
+                <button
+                  onClick={(e) => handleDeleteClick(file, e)}
+                  style={{
+                    backgroundColor: "transparent",
+                    border: "none",
+                    color: "var(--error)",
+                    cursor: "pointer",
+                    padding: "4px",
+                    borderRadius: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--error-light)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  <span style={{ fontSize: "1.2rem" }}>🗑️</span>
+                </button>
               </div>
               <small style={{ 
                 color: "var(--text-light)",
@@ -176,6 +243,88 @@ const Sidebar = ({ onFileSelect }) => {
           backgroundColor: "var(--background-light)",
           borderRadius: "8px"
         }}>No files found.</p>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: "var(--white)",
+            padding: "2rem",
+            borderRadius: "8px",
+            boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+            maxWidth: "400px",
+            width: "90%"
+          }}>
+            <h3 style={{ 
+              color: "var(--text-dark)",
+              marginBottom: "1rem"
+            }}>Delete File</h3>
+            <p style={{ 
+              color: "var(--text-dark)",
+              marginBottom: "1.5rem"
+            }}>
+              Are you sure you want to delete "{fileToDelete?.filename}"? This action cannot be undone.
+            </p>
+            <div style={{
+              display: "flex",
+              gap: "1rem",
+              justifyContent: "flex-end"
+            }}>
+              <button
+                onClick={handleDeleteCancel}
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "var(--white)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  color: "var(--text-dark)",
+                  transition: "all 0.2s ease"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--background-light)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--white)";
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "var(--error)",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  color: "var(--white)",
+                  transition: "all 0.2s ease"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--error-dark)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--error)";
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </aside>
   );

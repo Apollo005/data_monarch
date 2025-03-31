@@ -5,6 +5,10 @@ from database.users import SessionLocal
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
+import os
+from database.files import engine
+import re
+from utils.sanitize import sanitize_table_name_sql
 
 router = APIRouter()
 
@@ -61,6 +65,7 @@ async def delete_file(
     db: Session = Depends(get_db)
 ):
     """Delete a specific file (if owned by the current user)"""
+    # Get the file from the user's files
     file = db.query(File).filter(
         File.id == file_id,
         File.user_id == current_user.id
@@ -69,6 +74,29 @@ async def delete_file(
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
     
-    db.delete(file)
-    db.commit()
-    return {"message": "File deleted successfully"} 
+    try:
+        # Sanitize the table name
+        table_name = sanitize_table_name_sql(file.filename)
+        
+        # Delete the file from the data_monarch database
+        with engine.connect() as conn:
+            try:
+                # Drop the table if it exists
+                conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
+                conn.commit()
+            except Exception as e:
+                print(f"Error dropping table {table_name}: {str(e)}")
+                # Continue with file deletion even if table drop fails
+        
+        # Delete the file from the user's files
+        db.delete(file)
+        db.commit()
+        
+        return {"message": "File deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting file: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error deleting file: {str(e)}"
+        ) 

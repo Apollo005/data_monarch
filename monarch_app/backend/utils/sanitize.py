@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+import os
 
 def sanitize_table_name(file_name: str) -> str:
     #remove any non-alphabetic characters, replace spaces with underscores, and ensure it's not too long
@@ -23,3 +24,14 @@ def sanitize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = df[col].apply(sanitize_string_input)
     
     return df
+
+def sanitize_table_name_sql(filename):
+    """Sanitize the filename to be a valid SQL table name"""
+    # Remove file extension
+    name = os.path.splitext(filename)[0]
+    # Replace invalid characters with underscores
+    name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    # Ensure it starts with a letter
+    if not name[0].isalpha():
+        name = 'tbl_' + name
+    return name
