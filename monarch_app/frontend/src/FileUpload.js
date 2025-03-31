@@ -31,11 +31,12 @@ const FileUpload = ({ onDataUpload, existingData }) => {
     formData.append("file", file);
 
     try {
-      const response = await axios.post(`${config.baseUrl}/api/data/upload`, formData, {
+      const response = await axios.post(`${config.baseUrl}/api/data/upload/`, formData, {
         headers: { 
           "Content-Type": "multipart/form-data",
           "Authorization": `Bearer ${token}`
         },
+        withCredentials: true
       });
 
       setMessage("Upload successful!");

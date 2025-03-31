@@ -3,6 +3,7 @@ from models.filter import filter_data
 from routes.auth import router as auth_router
 from routes.upload import router as upload_router
 from routes.files import router as files_router
+from routes.data import router as data_router
 
 app = FastAPI()
 
@@ -18,6 +19,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(files_router)
+app.include_router(data_router)
 
 #testing the app
 @app.get("/")
