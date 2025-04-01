@@ -116,7 +116,7 @@ async def upload_file(
 
                     #make this user input afterwards and check for column-data imbalance
                     #default error message is "error processing solar_flux.txt: 7 columns passed, passed data had 5 columns"
-                    column_names = ["Year", "HH:mm", " value ", "qualifier", "description"]
+                    column_names = ["Year", "BONA", "TENA", "CEAM", "NHSA", "SHSA", "EURO", "MIDE" , "NHAF", "SHAF", "BOAS", "TEAS", "SEAS", "EQAS", "AUST", "Globe"]
                     df = pd.DataFrame(data, columns=column_names)
 
                 df = df.apply(pd.to_numeric, errors='ignore')

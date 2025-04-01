@@ -9,11 +9,13 @@ import './styles/global.css';
 function Dashboard({ onLogout }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('upload');
+  const [originalData, setOriginalData] = useState(null);
   const [uploadedData, setUploadedData] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [visibleColumns, setVisibleColumns] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ column: null, direction: null, clicks: 0 });
 
   const handleLogout = () => {
     onLogout();
@@ -25,6 +27,57 @@ function Dashboard({ onLogout }) {
       const newVisible = { ...prev };
       newVisible[column] = !newVisible[column];
       return newVisible;
+    });
+  };
+
+  const handleColumnSort = (column) => {
+    // Check if the column contains numerical data
+    const isNumerical = uploadedData.every(row => !isNaN(row[column]));
+    const isValidDate = uploadedData.every(row => {
+      const dateTest = new Date(row[column]);
+      return !isNaN(dateTest.valueOf());
+    });
+    
+    if (!isNumerical && !isValidDate) return; // Only sort numerical columns
+
+    setSortConfig(prevConfig => {
+      let newDirection = 'desc';
+      let newClicks = 1;
+
+      if (prevConfig.column === column) {
+        if (prevConfig.clicks === 1) {
+          newDirection = 'asc';
+          newClicks = 2;
+        } else if (prevConfig.clicks === 2) {
+          newDirection = null;
+          newClicks = 3;
+        }
+      }
+
+      // Sort the data
+      if (newDirection) {
+        const sortedData = [...uploadedData].sort((a, b) => {
+          let aVal, bVal;
+          if (isNumerical) {
+              aVal = parseFloat(a[column]);
+              bVal = parseFloat(b[column]);
+          }else if (isValidDate){
+              aVal = new Date(a[column]).valueOf();
+              bVal = new Date(b[column]).valueOf();
+          }
+            
+          return newDirection === 'desc' ? bVal - aVal : aVal - bVal;
+        });
+        setUploadedData(sortedData);
+      } else {
+        setUploadedData(originalData);// Reset to original order
+      }
+
+      return {
+        column,
+        direction: newDirection,
+        clicks: newClicks
+      };
     });
   };
 
@@ -56,6 +109,7 @@ function Dashboard({ onLogout }) {
       }
       
       const data = await response.json();
+      setOriginalData(data.data);
       setUploadedData(data.data);
       // Initialize visible columns when file is selected
       const initialVisible = {};
@@ -157,14 +211,45 @@ function Dashboard({ onLogout }) {
                 visibleColumns[column] && (
                   <th 
                     key={column}
+                    onClick={() => handleColumnSort(column)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--primary-dark)";
+                      e.currentTarget.style.color = "var(--white)";
+                    }}
+                    onMouseLeave={(e) => {
+                      // Preserve highlighted background if this column is currently sorted
+                      if (sortConfig.column === column) {
+                        e.currentTarget.style.backgroundColor = "var(--primary-color)";
+                        e.currentTarget.style.color = "var(--text-dark)";
+                      } else {
+                        e.currentTarget.style.backgroundColor = "var(--white)";
+                        e.currentTarget.style.color = "var(--text-dark)";
+                      }
+                    }}
                     style={{
                       width: `${100 / Object.values(visibleColumns).filter(Boolean).length}%`,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
-                      textOverflow: 'ellipsis'
+                      textOverflow: 'ellipsis',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      padding: '0.75rem',
+                      backgroundColor: sortConfig.column === column ? 'var(--primary-color-light)' : 'var(--white)',
+                      transition: 'background-color 0.2s ease'
                     }}
                   >
                     {column}
+                    {sortConfig.column === column && (
+                      <span style={{
+                        position: 'absolute',
+                        right: '0.5rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: 'var(--primary-color)'
+                      }}>
+                        {sortConfig.direction === 'desc' ? '↓' : sortConfig.direction === 'asc' ? '↑' : ''}
+                      </span>
+                    )}
                   </th>
                 )
               ))}
@@ -180,7 +265,8 @@ function Dashboard({ onLogout }) {
                       style={{
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis'
+                        textOverflow: 'ellipsis',
+                        padding: '0.75rem'
                       }}
                     >
                       {row[column]}
