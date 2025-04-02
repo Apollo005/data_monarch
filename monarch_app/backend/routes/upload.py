@@ -8,8 +8,9 @@ from utils.sanitize import sanitize_table_name, sanitize_dataframe
 from utils.db_helpers import check_if_table_exists, create_table_from_df
 from utils.text_extract import extract_table_from_txt
 from sqlalchemy.orm import Session
-from fastapi import File, UploadFile
+from fastapi import File, UploadFile, Form
 from sqlalchemy.exc import SQLAlchemyError
+from typing import Optional
 
 router = APIRouter()
 
@@ -23,6 +24,7 @@ def get_db():
 @router.post("/api/data/upload/")
 async def upload_file(
     file: UploadFile = File(...),
+    column_names: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -114,9 +116,18 @@ async def upload_file(
                     #convert space-separated values into a structured DataFrame
                     data = [line.split() for line in lines if len(line.split()) > 1]
 
-                    #make this user input afterwards and check for column-data imbalance
-                    #default error message is "error processing solar_flux.txt: 7 columns passed, passed data had 5 columns"
-                    column_names = ["Year", "BONA", "TENA", "CEAM", "NHSA", "SHSA", "EURO", "MIDE" , "NHAF", "SHAF", "BOAS", "TEAS", "SEAS", "EQAS", "AUST", "Globe"]
+                    # Use provided column names if available, otherwise use default
+                    if column_names:
+                        column_names = [col.strip() for col in column_names.split(',')]
+                        # if len(column_names) != len(data[0]):
+                        #     raise HTTPException(
+                        #         status_code=400,
+                        #         detail=f"Number of columns ({len(column_names)}) doesn't match the data ({len(data[0])} columns)"
+                        #     )
+                    else:
+                        # Default column names if none provided
+                        column_names = [f"Column_{i+1}" for i in range(len(data[0]))]
+                    
                     df = pd.DataFrame(data, columns=column_names)
 
                 df = df.apply(pd.to_numeric, errors='ignore')

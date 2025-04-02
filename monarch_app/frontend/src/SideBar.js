@@ -177,29 +177,36 @@ const Sidebar = ({ onFileSelect }) => {
           <button
             onClick={handleNewUpload}
             style={{
-              backgroundColor: "var(--primary-color)",
-              color: "var(--white)",
-              border: "none",
-              borderRadius: "50%",
-              width: "32px",
-              height: "32px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                position: "absolute",
+                top: "1rem", // Adjusted position to not overlap other content
+                right: "1rem", // Adjusted position to align the button
+                width: "36px", // Same size as the toggle button
+                height: "36px", // Same size as the toggle button
+                borderRadius: "50%", // Round shape like the toggle button
+                backgroundColor: "var(--primary-color)", // Matching background color
+                border: "none",
+                color: "var(--white)", // White text
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                zIndex: 10,
+                fontSize: "1.2rem", // Font size for the "+" symbol
+                boxShadow: "0 0 8px var(--primary-light)", // Shadow for depth
+                transition: "transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease", // Transition on hover
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "scale(1.1)";
-              e.currentTarget.style.backgroundColor = "var(--primary-color-dark)";
+                e.currentTarget.style.transform = "rotate(90deg) scale(1.1)"; // Rotate on hover
+                e.currentTarget.style.backgroundColor = "var(--primary-dark)"; // Darker shade on hover
+                e.currentTarget.style.boxShadow = "0 0 12px var(--primary-color)"; // Stronger shadow on hover
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "scale(1)";
-              e.currentTarget.style.backgroundColor = "var(--primary-color)";
+                e.currentTarget.style.transform = "rotate(0deg) scale(1)"; // Reset rotation and scale
+                e.currentTarget.style.backgroundColor = "var(--primary-color)"; // Reset background color
+                e.currentTarget.style.boxShadow = "0 0 8px var(--primary-light)"; // Reset shadow
             }}
           >
-            <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>+</span>
+            <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>+</span> {/* Adjusted size for "+" */}
           </button>
         </div>
 
