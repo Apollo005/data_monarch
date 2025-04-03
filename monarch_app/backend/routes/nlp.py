@@ -4,17 +4,18 @@ from routes.auth import get_current_user
 from database.users import SessionLocal
 from database.tables import File
 import pandas as pd
-from sqlalchemy import create_engine, text, Table, Column, Integer, String, Float, MetaData, select
+from sqlalchemy import create_engine, text, Table, Column, Integer, String, Float, MetaData, select, inspect
 from database.files import engine
 import os
 from dotenv import load_dotenv
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 import logging
 from google import genai
 from google.api_core import exceptions as google_exceptions
 from pydantic import BaseModel
 import json
 import re
+from enum import Enum
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -35,6 +36,30 @@ class FilterRequest(BaseModel):
     class Config:
         orm_mode = True
 
+class Operator(Enum):
+    EQUALS = "="
+    NOT_EQUALS = "!="
+    GREATER_THAN = ">"
+    LESS_THAN = "<"
+    GREATER_EQUAL = ">="
+    LESS_EQUAL = "<="
+    IS_NULL = "IS NULL"
+    IS_NOT_NULL = "IS NOT NULL"
+    LIKE = "LIKE"
+    NOT_LIKE = "NOT LIKE"
+    IN = "IN"
+    NOT_IN = "NOT IN"
+
+# List of forbidden SQL keywords and patterns
+FORBIDDEN_KEYWORDS = [
+    "DROP", "TRUNCATE", "DELETE", "INSERT", "UPDATE", "ALTER", "CREATE", "GRANT",
+    "REVOKE", "EXECUTE", "EXEC", "UNION", "JOIN", "HAVING", "GROUP BY", "ORDER BY",
+    "LIMIT", "OFFSET", "WITH", "CASE", "WHEN", "THEN", "ELSE", "END"
+]
+
+# List of forbidden comment patterns
+FORBIDDEN_COMMENTS = ["--", "#", "/*", "*/"]
+
 def get_db():
     db = SessionLocal()
     try:
@@ -47,45 +72,147 @@ def get_next_table_name(db: Session, base_name: str) -> str:
     i = 1
     while True:
         new_name = f"{base_name}_edit_{i}"
-        # Check if table exists
+        # Check if table exists using parameterized query
         with engine.connect() as connection:
-            result = connection.execute(text(f"""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = '{new_name}'
-                );
-            """))
+            result = connection.execute(
+                text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :table_name)"),
+                {"table_name": new_name}
+            )
             exists = result.scalar()
         if not exists:
             return new_name
         i += 1
 
-def create_new_table_from_query(db: Session, source_table: str, new_table: str, query: str) -> None:
+def create_new_table_from_query(db: Session, source_table: str, new_table: str, query: str, params: Dict[str, Any]) -> None:
     """Create a new table from the results of a query on the source table."""
     with engine.connect() as connection:
-        # First, get the column names from the source table
-        result = connection.execute(text(f"""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = '{source_table}'
-        """))
+        # First, get the column names from the source table using parameterized query
+        result = connection.execute(
+            text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = :table_name
+            """),
+            {"table_name": source_table}
+        )
         columns = [row[0] for row in result]
         
         # Create new table with the same structure as source table
-        connection.execute(text(f"""
-            CREATE TABLE {new_table} AS 
-            SELECT * FROM {source_table} WHERE 1=0;
-        """))
+        connection.execute(
+            text(f"CREATE TABLE {new_table} AS SELECT * FROM {source_table} WHERE 1=0")
+        )
         
-        # Copy data based on the query
-        connection.execute(text(f"""
-            INSERT INTO {new_table}
-            SELECT * FROM {source_table}
-            WHERE {query};
-        """))
+        # Copy data based on the query using parameterized query
+        connection.execute(
+            text(f"INSERT INTO {new_table} SELECT * FROM {source_table} WHERE {query}"),
+            params
+        )
         
         # Commit the transaction
         connection.commit()
+
+def validate_table_name(table_name: str) -> bool:
+    """Validate that the table name is safe to use."""
+    # Only allow alphanumeric characters, underscores, and dots
+    return bool(re.match(r'^[a-zA-Z0-9_\.]+$', table_name))
+
+def validate_column_name(column_name: str) -> bool:
+    """Validate that the column name is safe to use."""
+    # Only allow alphanumeric characters and underscores
+    return bool(re.match(r'^[a-zA-Z0-9_]+$', column_name))
+
+def contains_forbidden_keywords(query: str) -> bool:
+    """Check if the query contains any forbidden SQL keywords or patterns."""
+    query_upper = query.upper()
+    return any(keyword in query_upper for keyword in FORBIDDEN_KEYWORDS)
+
+def contains_forbidden_comments(query: str) -> bool:
+    """Check if the query contains any forbidden comment patterns."""
+    return any(comment in query for comment in FORBIDDEN_COMMENTS)
+
+def parse_condition(condition: str) -> Tuple[str, str, str]:
+    """Parse a condition into column name, operator, and value."""
+    # Remove any quotes around the value
+    condition = condition.strip()
+    
+    # Handle IS NULL and IS NOT NULL cases
+    if "IS NULL" in condition.upper():
+        parts = condition.split("IS NULL")
+        column = parts[0].strip()
+        # Remove quotes if present
+        if column.startswith(('"', "'")) and column.endswith(('"', "'")):
+            column = column[1:-1]
+        if not column:
+            raise ValueError("Empty column name in IS NULL condition")
+        return column, "IS NULL", None
+    elif "IS NOT NULL" in condition.upper():
+        parts = condition.split("IS NOT NULL")
+        column = parts[0].strip()
+        # Remove quotes if present
+        if column.startswith(('"', "'")) and column.endswith(('"', "'")):
+            column = column[1:-1]
+        if not column:
+            raise ValueError("Empty column name in IS NOT NULL condition")
+        return column, "IS NOT NULL", None
+    
+    # Handle other operators
+    operators = [op.value for op in Operator]
+    for op in sorted(operators, key=len, reverse=True):
+        if op in condition:
+            parts = condition.split(op)
+            if len(parts) == 2:
+                column = parts[0].strip()
+                # Remove quotes if present
+                if column.startswith(('"', "'")) and column.endswith(('"', "'")):
+                    column = column[1:-1]
+                if not column:
+                    raise ValueError(f"Empty column name before operator {op}")
+                value = parts[1].strip()
+                # Remove quotes if present
+                if value.startswith(("'", '"')) and value.endswith(("'", '"')):
+                    value = value[1:-1]
+                return column, op, value
+    
+    raise ValueError(f"Could not parse condition: {condition}")
+
+def validate_operator(operator: str) -> bool:
+    """Validate that the operator is in the allowed set."""
+    return operator in [op.value for op in Operator]
+
+def sanitize_query(query: str) -> str:
+    """Sanitize the query by removing any forbidden patterns and validating structure."""
+    if contains_forbidden_keywords(query):
+        raise ValueError("Query contains forbidden SQL keywords")
+    
+    if contains_forbidden_comments(query):
+        raise ValueError("Query contains forbidden comment patterns")
+    
+    # Split the query into individual conditions
+    conditions = [cond.strip() for cond in query.split("AND") if cond.strip()]
+    
+    sanitized_conditions = []
+    for condition in conditions:
+        try:
+            column, operator, value = parse_condition(condition)
+            
+            # Validate column name
+            if not column or not validate_column_name(column):
+                raise ValueError(f"Invalid column name: {column}")
+            
+            if not validate_operator(operator):
+                raise ValueError(f"Invalid operator: {operator}")
+            
+            if value is None:
+                sanitized_conditions.append(f'"{column}" {operator}')
+            else:
+                sanitized_conditions.append(f'"{column}" {operator} :val_{len(sanitized_conditions)}')
+        except ValueError as e:
+            raise ValueError(f"Invalid condition format: {str(e)}")
+    
+    if not sanitized_conditions:
+        raise ValueError("No valid conditions found in query")
+    
+    return " AND ".join(sanitized_conditions)
 
 def process_natural_language_query(query: str, df: pd.DataFrame) -> Dict[str, Any]:
     """
@@ -115,7 +242,7 @@ def process_natural_language_query(query: str, df: pd.DataFrame) -> Dict[str, An
         
         Important: 
         1. Return only the JSON object, no other text or formatting.
-        2. The column name will be explicit if in quotations so please keep them as so.
+        2. Do not include quotes around column names in the query - they will be added automatically.
         3. Use the exact column names as provided in the available columns list.
         4. Column names are case-sensitive, so use them exactly as they appear.
         5. Do not include table names in the query - they will be added automatically.
@@ -123,8 +250,10 @@ def process_natural_language_query(query: str, df: pd.DataFrame) -> Dict[str, An
         7. Make sure to use the exact column names from the provided list.
         8. Column names in PostgreSQL are case-sensitive, so use them exactly as they appear in the list.
         9. The column names must match exactly, including case.
-        10. Do not include quotes around column names - they will be added automatically.
-        11. The column names must be used exactly as they appear in the list, with the same case.
+        10. Never use empty column names or values in the query.
+        11. Always ensure the column name exists before the operator.
+        12. Do not include any quotes around column names - they will be added automatically.
+        13. Do not include quotes around column names in the query - they will be added automatically.
         """
         
         # Create a user message with the query and column information
@@ -164,6 +293,10 @@ def process_natural_language_query(query: str, df: pd.DataFrame) -> Dict[str, An
             for key in required_keys:
                 if key not in operation_dict:
                     raise ValueError(f"Missing required key: {key}")
+            
+            # Validate the query format
+            if not operation_dict["query"].strip():
+                raise ValueError("Empty query string")
             
             return operation_dict
             
@@ -213,23 +346,37 @@ async def filter_data(
             logger.error(f"File not found for id: {request.file_id}")
             raise HTTPException(status_code=404, detail="File not found")
         
-        # Get the source table name
+        # Get the source table name and validate it
         source_table = file_record.file_path
+        if not validate_table_name(source_table):
+            raise HTTPException(status_code=400, detail="Invalid table name")
+        
         logger.info(f"Processing data from table: {source_table}")
         
         # Get the next available table name
         new_table = get_next_table_name(db, source_table)
+        if not validate_table_name(new_table):
+            raise HTTPException(status_code=400, detail="Invalid new table name")
+        
         logger.info(f"Creating new table: {new_table}")
         
-        # Get the actual column names from the current table
+        # Get the actual column names from the current table using parameterized query
         with engine.connect() as connection:
-            result = connection.execute(text(f"""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = '{source_table}'
-            """))
+            result = connection.execute(
+                text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = :table_name
+                """),
+                {"table_name": source_table}
+            )
             columns = [row[0] for row in result]
             logger.info(f"Found columns in table {source_table}: {columns}")
+            
+            # Validate all column names
+            for column in columns:
+                if not validate_column_name(column):
+                    raise HTTPException(status_code=400, detail=f"Invalid column name: {column}")
             
             # Create a dummy DataFrame with the actual column names
             df = pd.DataFrame(columns=columns)
@@ -237,51 +384,33 @@ async def filter_data(
             # Process the natural language query
             operation_dict = process_natural_language_query(request.query, df)
             
-            # Validate that the column exists in the current table
-            query_lower = operation_dict["query"].lower()
-            column_found = False
-            matching_column = None
+            # Sanitize and validate the query
+            try:
+                sanitized_query = sanitize_query(operation_dict["query"])
+                # Extract parameters from the original query
+                params = {}
+                conditions = [cond.strip() for cond in operation_dict["query"].split("AND") if cond.strip()]
+                for i, condition in enumerate(conditions):
+                    _, _, value = parse_condition(condition)
+                    if value is not None:
+                        params[f"val_{i}"] = value
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid query format: {str(e)}")
             
-            # First, try to find an exact match (case-sensitive)
-            for column in columns:
-                if column in operation_dict["query"]:
-                    column_found = True
-                    matching_column = column
-                    break
-            
-            # If no exact match, try case-insensitive match
-            if not column_found:
-                for column in columns:
-                    if column.lower() in query_lower:
-                        column_found = True
-                        matching_column = column
-                        # Replace all occurrences of the column name (case-insensitive)
-                        operation_dict["query"] = re.sub(
-                            f'\\b{column}\\b',
-                            f'"{column}"',
-                            operation_dict["query"],
-                            flags=re.IGNORECASE
-                        )
-                        break
-            
-            if not column_found:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Column not found in table. Available columns: {columns}"
-                )
-            
-            logger.info(f"Using column '{matching_column}' for filtering")
-            logger.info(f"Final query: {operation_dict['query']}")
+            logger.info(f"Using sanitized query: {sanitized_query}")
+            logger.info(f"With parameters: {params}")
             
             # Create new table with filtered data
-            create_new_table_from_query(db, source_table, new_table, operation_dict["query"])
+            create_new_table_from_query(db, source_table, new_table, sanitized_query, params)
             
             # Update the file record with the new table name
             file_record.file_path = new_table
             db.commit()
             
-            # Fetch the filtered data
-            result = connection.execute(text(f"SELECT * FROM {new_table}"))
+            # Fetch the filtered data using parameterized query
+            result = connection.execute(
+                text(f"SELECT * FROM {new_table}")
+            )
             # Convert the result to a list of dictionaries
             records = []
             for row in result:
