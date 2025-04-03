@@ -16,6 +16,9 @@ function Dashboard({ onLogout }) {
   const [error, setError] = useState(null);
   const [visibleColumns, setVisibleColumns] = useState(null);
   const [sortConfig, setSortConfig] = useState({ column: null, direction: null, clicks: 0 });
+  const [filterQuery, setFilterQuery] = useState('');
+  const [filterDescription, setFilterDescription] = useState('');
+  const [isFiltering, setIsFiltering] = useState(false);
 
   const handleLogout = () => {
     onLogout();
@@ -129,7 +132,6 @@ function Dashboard({ onLogout }) {
   const tabs = [
     { id: 'upload', label: 'Upload Data' },
     { id: 'view', label: 'View Data' },
-    { id: 'clean', label: 'Clean Data' },
     { id: 'filter', label: 'Filter Data' },
     { id: 'analyze', label: 'Analyze Data' },
     { id: 'visualize', label: 'Visualize' },
@@ -158,6 +160,51 @@ function Dashboard({ onLogout }) {
       initialVisible[column] = true;
     });
     setVisibleColumns(initialVisible);
+  };
+
+  const handleFilterSubmit = async () => {
+    if (!uploadedData || !selectedFile) {
+      setError('Please upload or select a file first');
+      return;
+    }
+
+    setIsFiltering(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.baseUrl}/api/data/filter`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_id: selectedFile.id,
+          query: filterQuery
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to apply filter';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch (e) {
+          console.error('Error parsing error response:', e);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      setUploadedData(result.data);
+      setFilterDescription(result.description);
+    } catch (error) {
+      console.error('Error applying filter:', error);
+      setError(error.message || 'An unexpected error occurred while applying the filter');
+    } finally {
+      setIsFiltering(false);
+    }
   };
 
   const renderDataTable = () => {
@@ -354,7 +401,62 @@ function Dashboard({ onLogout }) {
             {uploadedData ? (
               <div>
                 <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Filter Data</h3>
-                <p>Data filtering functionality coming soon...</p>
+                <div style={{ marginBottom: '1rem' }}>
+                  <textarea
+                    value={filterQuery}
+                    onChange={(e) => setFilterQuery(e.target.value)}
+                    placeholder="Enter your filter query (e.g., 'Remove rows with null values', 'Group by column X', 'Filter rows where column Y > 2')"
+                    style={{
+                      width: '100%',
+                      minHeight: '100px',
+                      padding: '0.75rem',
+                      borderRadius: '4px',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: 'var(--white)',
+                      color: 'var(--text-dark)',
+                      fontFamily: 'inherit',
+                      fontSize: '1rem',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={handleFilterSubmit}
+                  disabled={isFiltering || !filterQuery.trim()}
+                  style={{
+                    backgroundColor: 'var(--primary-color)',
+                    color: 'var(--white)',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '4px',
+                    border: 'none',
+                    cursor: isFiltering || !filterQuery.trim() ? 'not-allowed' : 'pointer',
+                    opacity: isFiltering || !filterQuery.trim() ? 0.7 : 1,
+                    marginBottom: '1rem'
+                  }}
+                >
+                  {isFiltering ? 'Applying Filter...' : 'Apply Filter'}
+                </button>
+                {filterDescription && (
+                  <div style={{
+                    padding: '1rem',
+                    backgroundColor: 'var(--background-light)',
+                    borderRadius: '4px',
+                    marginBottom: '1rem'
+                  }}>
+                    <strong>Applied Filter:</strong> {filterDescription}
+                  </div>
+                )}
+                {error && (
+                  <div style={{
+                    color: 'var(--error)',
+                    padding: '1rem',
+                    backgroundColor: 'var(--background-light)',
+                    borderRadius: '4px',
+                    marginBottom: '1rem'
+                  }}>
+                    {error}
+                  </div>
+                )}
               </div>
             ) : (
               <div>

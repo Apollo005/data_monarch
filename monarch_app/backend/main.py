@@ -4,6 +4,7 @@ from routes.auth import router as auth_router
 from routes.upload import router as upload_router
 from routes.files import router as files_router
 from routes.data import router as data_router
+from routes.nlp import router as nlp_router
 
 app = FastAPI()
 
@@ -20,6 +21,7 @@ app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(files_router)
 app.include_router(data_router)
+app.include_router(nlp_router)
 
 #testing the app
 @app.get("/")
