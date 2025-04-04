@@ -19,6 +19,8 @@ function Dashboard({ onLogout }) {
   const [filterQuery, setFilterQuery] = useState('');
   const [filterDescription, setFilterDescription] = useState('');
   const [isFiltering, setIsFiltering] = useState(false);
+  const [dataHistory, setDataHistory] = useState([]);
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
 
   const handleLogout = () => {
     onLogout();
@@ -90,6 +92,9 @@ function Dashboard({ onLogout }) {
       setSelectedFile(null);
       setUploadedData(null);
       setActiveTab('upload');
+      // Reset history when clearing file
+      setDataHistory([]);
+      setCurrentHistoryIndex(-1);
       return;
     }
 
@@ -114,6 +119,9 @@ function Dashboard({ onLogout }) {
       const data = await response.json();
       setOriginalData(data.data);
       setUploadedData(data.data);
+      // Initialize history with the first data load
+      setDataHistory([data.data]);
+      setCurrentHistoryIndex(0);
       // Initialize visible columns when file is selected
       const initialVisible = {};
       Object.keys(data.data[0] || {}).forEach(column => {
@@ -154,12 +162,33 @@ function Dashboard({ onLogout }) {
 
   const handleDataUpload = (data) => {
     setUploadedData(data);
+    // Initialize history with uploaded data
+    setDataHistory([data]);
+    setCurrentHistoryIndex(0);
     // Initialize visible columns when data is uploaded
     const initialVisible = {};
     Object.keys(data[0] || {}).forEach(column => {
       initialVisible[column] = true;
     });
     setVisibleColumns(initialVisible);
+  };
+
+  const handleUndo = () => {
+    if (currentHistoryIndex > 0 && dataHistory.length > 0) {
+      const newIndex = currentHistoryIndex - 1;
+      setCurrentHistoryIndex(newIndex);
+      setUploadedData(dataHistory[newIndex]);
+      setFilterDescription(`Undid to previous state (${newIndex + 1}/${dataHistory.length})`);
+    }
+  };
+
+  const handleRedo = () => {
+    if (currentHistoryIndex < dataHistory.length - 1 && dataHistory.length > 0) {
+      const newIndex = currentHistoryIndex + 1;
+      setCurrentHistoryIndex(newIndex);
+      setUploadedData(dataHistory[newIndex]);
+      setFilterDescription(`Redid to next state (${newIndex + 1}/${dataHistory.length})`);
+    }
   };
 
   const handleFilterSubmit = async () => {
@@ -197,8 +226,16 @@ function Dashboard({ onLogout }) {
       }
 
       const result = await response.json();
+      
+      // Add current state to history before updating
+      const newHistory = dataHistory.slice(0, currentHistoryIndex + 1);
+      newHistory.push(result.data);
+      setDataHistory(newHistory);
+      setCurrentHistoryIndex(newHistory.length - 1);
+      
       setUploadedData(result.data);
       setFilterDescription(result.description);
+      setFilterQuery(''); // Clear the filter query after successful application
     } catch (error) {
       console.error('Error applying filter:', error);
       setError(error.message || 'An unexpected error occurred while applying the filter');
@@ -400,7 +437,57 @@ function Dashboard({ onLogout }) {
           <div className="card">
             {uploadedData ? (
               <div>
-                <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Filter Data</h3>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1rem'
+                }}>
+                  <h3 style={{ color: 'var(--text-dark)', margin: 0 }}>Filter Data</h3>
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.5rem'
+                  }}>
+                    <button
+                      onClick={handleUndo}
+                      disabled={currentHistoryIndex <= 0}
+                      className="btn"
+                      style={{
+                        backgroundColor: currentHistoryIndex <= 0 ? 'var(--background-light)' : 'var(--primary-color)',
+                        color: currentHistoryIndex <= 0 ? 'var(--text-light)' : 'var(--white)',
+                        border: 'none',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '4px',
+                        cursor: currentHistoryIndex <= 0 ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      ↩ Undo
+                    </button>
+                    <button
+                      onClick={handleRedo}
+                      disabled={currentHistoryIndex >= dataHistory.length - 1}
+                      className="btn"
+                      style={{
+                        backgroundColor: currentHistoryIndex >= dataHistory.length - 1 ? 'var(--background-light)' : 'var(--primary-color)',
+                        color: currentHistoryIndex >= dataHistory.length - 1 ? 'var(--text-light)' : 'var(--white)',
+                        border: 'none',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '4px',
+                        cursor: currentHistoryIndex >= dataHistory.length - 1 ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      ↪ Redo
+                    </button>
+                  </div>
+                </div>
                 <div style={{ marginBottom: '1rem' }}>
                   <textarea
                     value={filterQuery}

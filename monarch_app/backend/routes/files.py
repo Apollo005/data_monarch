@@ -3,14 +3,18 @@ from database.tables import User, File
 from routes.auth import get_current_user
 from database.users import SessionLocal
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 import os
 from database.files import engine
 import re
 from utils.sanitize import sanitize_table_name_sql
+from pydantic import BaseModel, ConfigDict
+import logging
 
 router = APIRouter()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def get_db():
     db = SessionLocal()
@@ -24,14 +28,17 @@ class FileResponse(BaseModel):
     filename: str
     file_path: str
     file_type: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     user_id: int
 
-    class Config:
-        from_attributes = True
-        populate_by_name = True
-        orm_mode = True
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        json_encoders={
+            datetime: lambda dt: dt.isoformat() if dt else None
+        }
+    )
 
 @router.get("/api/files", response_model=List[FileResponse])
 async def get_user_files(
@@ -39,8 +46,15 @@ async def get_user_files(
     db: Session = Depends(get_db)
 ):
     """Get all files associated with the current user"""
-    files = db.query(File).filter(File.user_id == current_user.id).order_by(File.created_at.asc()).all()
-    return files
+    try:
+        files = db.query(File).filter(File.user_id == current_user.id).order_by(File.created_at.asc()).all()
+        return [FileResponse.model_validate(file) for file in files]
+    except Exception as e:
+        logger.error(f"Error fetching files: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching files: {str(e)}"
+        )
 
 @router.get("/api/files/{file_id}", response_model=FileResponse)
 async def get_file(
@@ -49,14 +63,24 @@ async def get_file(
     db: Session = Depends(get_db)
 ):
     """Get a specific file by ID (if owned by the current user)"""
-    file = db.query(File).filter(
-        File.id == file_id,
-        File.user_id == current_user.id
-    ).first()
-    
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
-    return file
+    try:
+        file = db.query(File).filter(
+            File.id == file_id,
+            File.user_id == current_user.id
+        ).first()
+        
+        if not file:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        return FileResponse.model_validate(file)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching file: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching file: {str(e)}"
+        )
 
 @router.delete("/api/files/{file_id}")
 async def delete_file(
@@ -85,7 +109,7 @@ async def delete_file(
                 conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
                 conn.commit()
             except Exception as e:
-                print(f"Error dropping table {table_name}: {str(e)}")
+                logger.error(f"Error dropping table {table_name}: {str(e)}")
                 # Continue with file deletion even if table drop fails
         
         # Delete the file from the user's files
@@ -95,7 +119,7 @@ async def delete_file(
         return {"message": "File deleted successfully"}
     except Exception as e:
         db.rollback()
-        print(f"Error deleting file: {str(e)}")
+        logger.error(f"Error deleting file: {str(e)}")
         raise HTTPException(
             status_code=500, 
             detail=f"Error deleting file: {str(e)}"
