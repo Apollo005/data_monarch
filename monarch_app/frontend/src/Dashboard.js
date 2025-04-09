@@ -5,6 +5,7 @@ import Sidebar from './SideBar';
 import ThemeToggle from './components/ThemeToggle';
 import config from './config';
 import './styles/global.css';
+import 'font-awesome/css/font-awesome.min.css';
 
 function Dashboard({ onLogout }) {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ function Dashboard({ onLogout }) {
   const [isFiltering, setIsFiltering] = useState(false);
   const [dataHistory, setDataHistory] = useState([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
+  const [showHistoryPopup, setShowHistoryPopup] = useState(false);
+  const [historyDescriptions, setHistoryDescriptions] = useState([]);
 
   const handleLogout = () => {
     onLogout();
@@ -95,6 +98,7 @@ function Dashboard({ onLogout }) {
       // Reset history when clearing file
       setDataHistory([]);
       setCurrentHistoryIndex(-1);
+      setHistoryDescriptions([]);
       return;
     }
 
@@ -103,7 +107,9 @@ function Dashboard({ onLogout }) {
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${config.baseUrl}/api/data/${file.id}`, {
+
+      // Fetch the file data and version history
+      const response = await fetch(`${config.baseUrl}/api/data/history/${file.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -113,25 +119,65 @@ function Dashboard({ onLogout }) {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch file data');
+        throw new Error('Failed to fetch file data and history');
       }
-      
-      const data = await response.json();
-      setOriginalData(data.data);
-      setUploadedData(data.data);
-      // Initialize history with the first data load
-      setDataHistory([data.data]);
-      setCurrentHistoryIndex(0);
-      // Initialize visible columns when file is selected
-      const initialVisible = {};
-      Object.keys(data.data[0] || {}).forEach(column => {
-        initialVisible[column] = true;
-      });
-      setVisibleColumns(initialVisible);
+
+      const history = await response.json();
+
+      if (history && history.length > 0) {
+        // Set the data history based on fetched versions
+        setDataHistory(history.map(h => h.data));
+        setCurrentHistoryIndex(history.findIndex(h => h.is_current));
+        setHistoryDescriptions(history.map(h => h.description || ''));
+        
+        // Set the current data (most recent version)
+        const currentVersionIndex = history.findIndex(h => h.is_current);
+        setUploadedData(history[currentVersionIndex].data);
+        setFilterDescription(history[currentVersionIndex].description || '');
+
+        // Initialize visible columns when file is selected
+        const initialVisible = {};
+        Object.keys(history[0].data[0] || {}).forEach(column => {
+          initialVisible[column] = true;
+        });
+        setVisibleColumns(initialVisible);
+      } else {
+        // If no history exists, fetch the current file data
+        const dataResponse = await fetch(`${config.baseUrl}/api/data/${file.id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          credentials: 'include'
+        });
+        
+        if (!dataResponse.ok) {
+          throw new Error('Failed to fetch file data');
+        }
+        
+        const data = await dataResponse.json();
+        
+        // Initialize with the current data as the first history entry
+        setDataHistory([data.data]);
+        setCurrentHistoryIndex(0);
+        setHistoryDescriptions(['Initial data load']);
+        setUploadedData(data.data);
+        setFilterDescription('Initial data load');
+
+        // Initialize visible columns
+        const initialVisible = {};
+        Object.keys(data.data[0] || {}).forEach(column => {
+          initialVisible[column] = true;
+        });
+        setVisibleColumns(initialVisible);
+      }
+
       setActiveTab('view');
+
     } catch (error) {
       console.error('Error loading file:', error);
-      setError('Failed to load file data. Please try again.');
+      setError('Failed to load file data and history. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -233,6 +279,10 @@ function Dashboard({ onLogout }) {
       setDataHistory(newHistory);
       setCurrentHistoryIndex(newHistory.length - 1);
       
+      // Add description to history
+      const newDescription = filterDescription || `Filter applied: ${filterQuery}`;
+      setHistoryDescriptions(prev => [...prev.slice(0, currentHistoryIndex + 1), newDescription]);
+      
       setUploadedData(result.data);
       setFilterDescription(result.description);
       setFilterQuery(''); // Clear the filter query after successful application
@@ -242,6 +292,12 @@ function Dashboard({ onLogout }) {
     } finally {
       setIsFiltering(false);
     }
+  };
+
+  const handleHistoryClick = (index) => {
+    setCurrentHistoryIndex(index);
+    setUploadedData(dataHistory[index]);
+    setShowHistoryPopup(false);
   };
 
   const renderDataTable = () => {
@@ -449,6 +505,24 @@ function Dashboard({ onLogout }) {
                     gap: '0.5rem'
                   }}>
                     <button
+                      onClick={() => setShowHistoryPopup(true)}
+                      className="btn"
+                      style={{
+                        backgroundColor: 'var(--primary-color)',
+                        color: 'var(--white)',
+                        border: 'none',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <i className="fas fa-history" style={{ fontSize: '1.5rem' }}></i>
+                    </button>
+                    <button
                       onClick={handleUndo}
                       disabled={currentHistoryIndex <= 0}
                       className="btn"
@@ -630,6 +704,81 @@ function Dashboard({ onLogout }) {
     }
   };
 
+  const renderHistoryPopup = () => {
+    if (!showHistoryPopup) return null;
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000
+      }}>
+        <div style={{
+          backgroundColor: 'var(--background-light)',
+          padding: '2rem',
+          borderRadius: '8px',
+          width: '80%',
+          maxWidth: '600px',
+          maxHeight: '80vh',
+          overflow: 'auto',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem'
+          }}>
+            <h3 style={{ color: 'var(--text-dark)', margin: 0 }}>Edit History</h3>
+            <button
+              onClick={() => setShowHistoryPopup(false)}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: 'var(--text-dark)',
+                cursor: 'pointer',
+                fontSize: '1.5rem'
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem'
+          }}>
+            {dataHistory.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => handleHistoryClick(index)}
+                style={{
+                  padding: '1rem',
+                  backgroundColor: index === currentHistoryIndex ? 'var(--primary-color)' : 'var(--white)',
+                  color: index === currentHistoryIndex ? 'var(--white)' : 'var(--text-dark)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {historyDescriptions[index] || `Edit ${index + 1}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="dashboard">
       <nav className="navbar" style={{ 
@@ -721,6 +870,7 @@ function Dashboard({ onLogout }) {
           </div>
         </div>
       </div>
+      {renderHistoryPopup()}
     </div>
   );
 }

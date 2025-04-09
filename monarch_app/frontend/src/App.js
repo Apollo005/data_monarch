@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Login from "./Login";
 import Dashboard from "./Dashboard";
 import './styles/global.css';
+import 'font-awesome/css/font-awesome.min.css';
+
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

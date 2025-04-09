@@ -104,30 +104,77 @@ def get_next_table_name(db: Session, base_name: str) -> str:
 def create_new_table_from_query(db: Session, source_table: str, new_table: str, query: str, params: Dict[str, Any]) -> None:
     """Create a new table from the results of a query on the source table."""
     with data_engine.connect() as connection:
-        # First, get the column names from the source table using parameterized query
-        result = connection.execute(
-            text("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = :table_name
-            """),
-            {"table_name": source_table}
-        )
-        columns = [row[0] for row in result]
-        
-        # Create new table with the same structure as source table
-        connection.execute(
-            text(f"CREATE TABLE {new_table} AS SELECT * FROM {source_table} WHERE 1=0")
-        )
-        
-        # Copy data based on the query using parameterized query
-        connection.execute(
-            text(f"INSERT INTO {new_table} SELECT * FROM {source_table} WHERE {query}"),
-            params
-        )
-        
-        # Commit the transaction
-        connection.commit()
+        try:
+            # Start a transaction
+            trans = connection.begin()
+            
+            # First, get the column names from the source table using parameterized query
+            result = connection.execute(
+                text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = :table_name
+                """),
+                {"table_name": source_table}
+            )
+            columns = [row[0] for row in result]
+            logger.info(f"Found columns in table {source_table}: {columns}")
+            
+            # Create new table with the same structure as source table
+            connection.execute(
+                text(f"CREATE TABLE {new_table} AS SELECT * FROM {source_table} WHERE 1=0")
+            )
+            
+            # Do NOT modify the query here - it's already been sanitized
+            modified_query = query
+            
+            # First, verify the query works by trying to select from the source table
+            test_query = f"SELECT * FROM {source_table} WHERE {modified_query} LIMIT 1"
+            logger.info(f"Testing query: {test_query}")
+            
+            try:
+                test_result = connection.execute(text(test_query), params)
+                test_result.fetchone()  # This will raise an error if the query is invalid
+            except Exception as e:
+                logger.error(f"Test query failed: {str(e)}")
+                logger.error(f"Test query: {test_query}")
+                logger.error(f"Parameters: {params}")
+                raise ValueError(f"Invalid query: {str(e)}")
+            
+            # If the test query works, proceed with the insert
+            try:
+                # Create the insert query
+                insert_query = f"""
+                    INSERT INTO {new_table} 
+                    SELECT * FROM {source_table} 
+                    WHERE {modified_query}
+                """
+                logger.info(f"Executing insert query: {insert_query}")
+                connection.execute(text(insert_query), params)
+            except Exception as e:
+                logger.error(f"Insert query failed: {str(e)}")
+                logger.error(f"Insert query: {insert_query}")
+                logger.error(f"Parameters: {params}")
+                raise ValueError(f"Failed to insert data: {str(e)}")
+            
+            # Commit the transaction
+            trans.commit()
+            logger.info(f"Successfully created and populated table {new_table}")
+            
+        except Exception as e:
+            # Rollback the transaction on error
+            if 'trans' in locals():
+                trans.rollback()
+            logger.error(f"Error in create_new_table_from_query: {str(e)}")
+            logger.error(f"Original query: {query}")
+            logger.error(f"Modified query: {modified_query}")
+            logger.error(f"Params: {params}")
+            logger.error(f"Source table: {source_table}")
+            logger.error(f"New table: {new_table}")
+            logger.error(f"Full error details: {str(e.__class__.__name__)}: {str(e)}")
+            if hasattr(e, 'orig'):
+                logger.error(f"Original error: {str(e.orig)}")
+            raise e
 
 def validate_table_name(table_name: str) -> bool:
     """Validate that the table name is safe to use."""
@@ -136,8 +183,8 @@ def validate_table_name(table_name: str) -> bool:
 
 def validate_column_name(column_name: str) -> bool:
     """Validate that the column name is safe to use."""
-    # Only allow alphanumeric characters and underscores
-    return bool(re.match(r'^[a-zA-Z0-9_]+$', column_name))
+    # Only allow alphanumeric characters, underscores, and spaces
+    return bool(re.match(r'^[a-zA-Z0-9_\s]+$', column_name))
 
 def contains_forbidden_keywords(query: str) -> bool:
     """Check if the query contains any forbidden SQL keywords or patterns."""
@@ -220,6 +267,7 @@ def sanitize_query(query: str) -> str:
             if not validate_operator(operator):
                 raise ValueError(f"Invalid operator: {operator}")
             
+            # Quote column names - use single quotes to avoid conflicts with SQL string quotes
             if value is None:
                 sanitized_conditions.append(f'"{column}" {operator}')
             else:
@@ -272,6 +320,13 @@ def process_natural_language_query(query: str, df: pd.DataFrame) -> Dict[str, An
         11. Always ensure the column name exists before the operator.
         12. Do not include any quotes around column names - they will be added automatically.
         13. Do not include quotes around column names in the query - they will be added automatically.
+        14. For column names with spaces, use them exactly as they appear in the list.
+        15. For comparison operators, use standard SQL operators: =, !=, >, <, >=, <=
+        16. For numeric comparisons, ensure the value is a number without quotes.
+        17. For string comparisons, ensure the value is in quotes.
+        18. Always use the exact column name from the list, including spaces.
+        19. For column names with spaces, use them exactly as they appear in the list.
+        20. Do not modify the column names in any way - use them exactly as provided.
         """
         
         # Create a user message with the query and column information
@@ -315,6 +370,22 @@ def process_natural_language_query(query: str, df: pd.DataFrame) -> Dict[str, An
             # Validate the query format
             if not operation_dict["query"].strip():
                 raise ValueError("Empty query string")
+            
+            # Validate that all column names in the query exist in the DataFrame
+            query_lower = operation_dict["query"].lower()
+            for column in columns:
+                if column.lower() in query_lower:
+                    # Replace the lowercase column name with the exact column name
+                    operation_dict["query"] = operation_dict["query"].replace(column.lower(), column)
+            
+            # Ensure proper spacing around operators
+            operation_dict["query"] = re.sub(r'\s*([=<>!]+)\s*', r' \1 ', operation_dict["query"])
+            
+            # Validate numeric values are not quoted
+            operation_dict["query"] = re.sub(r'([=<>!]+)\s*[\'"](\d+)[\'"]', r'\1 \2', operation_dict["query"])
+            
+            # Log the final query for debugging
+            logger.info(f"Final processed query: {operation_dict['query']}")
             
             return operation_dict
             
@@ -462,13 +533,18 @@ async def filter_data(
                     if value is not None:
                         params[f"val_{i}"] = value
             except ValueError as e:
+                logger.error(f"Error sanitizing query: {str(e)}")
                 raise HTTPException(status_code=400, detail=f"Invalid query format: {str(e)}")
             
             logger.info(f"Using sanitized query: {sanitized_query}")
             logger.info(f"With parameters: {params}")
             
-            # Create new table with filtered data
-            create_new_table_from_query(data_db, source_table, new_table, sanitized_query, params)
+            try:
+                # Create new table with filtered data
+                create_new_table_from_query(data_db, source_table, new_table, sanitized_query, params)
+            except Exception as e:
+                logger.error(f"Error creating new table: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Error creating filtered table: {str(e)}")
             
             # Create new version entry using data_db
             version = create_version(
@@ -506,6 +582,9 @@ async def filter_data(
         
     except Exception as e:
         logger.error(f"Error filtering data: {str(e)}")
+        logger.error(f"Full error details: {str(e.__class__.__name__)}: {str(e)}")
+        if hasattr(e, 'orig'):
+            logger.error(f"Original error: {str(e.orig)}")
         raise HTTPException(status_code=500, detail=f"Error filtering data: {str(e)}")
 
 @router.post("/api/data/undo")
@@ -614,4 +693,39 @@ async def redo_filter(
         
     except Exception as e:
         logger.error(f"Error in redo operation: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error in redo operation: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error in redo operation: {str(e)}")
+
+@router.get("/api/data/history/{file_id}")
+async def get_version_history(
+    file_id: int,
+    current_user=Depends(get_current_user),
+    user_db: Session = Depends(get_user_db),
+    data_db: Session = Depends(get_data_db)
+):
+    try:
+        file_record = user_db.query(File).filter(
+            File.id == file_id, 
+            File.user_id == current_user.id
+        ).first()
+        if not file_record:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        versions = data_db.query(TableVersion).filter(
+            TableVersion.file_id == file_id
+        ).order_by(TableVersion.version.asc()).all()
+
+        version_data = []
+        with data_engine.connect() as conn:
+            for version in versions:
+                result = conn.execute(text(f"SELECT * FROM {version.table_name}"))
+                records = [dict(row._mapping) for row in result]
+                version_data.append({
+                    "version": version.version,
+                    "is_current": version.is_current,
+                    "description": version.description,
+                    "data": records
+                })
+
+        return version_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching version history: {str(e)}") 
