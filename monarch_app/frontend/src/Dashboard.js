@@ -24,6 +24,9 @@ function Dashboard({ onLogout }) {
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [showHistoryPopup, setShowHistoryPopup] = useState(false);
   const [historyDescriptions, setHistoryDescriptions] = useState([]);
+  const [versionToDelete, setVersionToDelete] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [versionNumbers, setVersionNumbers] = useState([]);
 
   const handleLogout = () => {
     onLogout();
@@ -99,6 +102,7 @@ function Dashboard({ onLogout }) {
       setDataHistory([]);
       setCurrentHistoryIndex(-1);
       setHistoryDescriptions([]);
+      setVersionNumbers([]);
       return;
     }
 
@@ -108,8 +112,8 @@ function Dashboard({ onLogout }) {
     try {
       const token = localStorage.getItem("token");
 
-      // Fetch the file data and version history
-      const response = await fetch(`${config.baseUrl}/api/data/history/${file.id}`, {
+      // First fetch the initial file data
+      const initialResponse = await fetch(`${config.baseUrl}/api/data/${file.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -118,56 +122,69 @@ function Dashboard({ onLogout }) {
         credentials: 'include'
       });
       
-      if (!response.ok) {
+      if (!initialResponse.ok) {
+        throw new Error('Failed to fetch initial file data');
+      }
+
+      const initialData = await initialResponse.json();
+
+      // Then fetch the file data and version history
+      const historyResponse = await fetch(`${config.baseUrl}/api/data/history/${file.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include'
+      });
+      
+      if (!historyResponse.ok) {
         throw new Error('Failed to fetch file data and history');
       }
 
-      const history = await response.json();
+      const history = await historyResponse.json();
 
       if (history && history.length > 0) {
-        // Set the data history based on fetched versions
-        setDataHistory(history.map(h => h.data));
-        setCurrentHistoryIndex(history.findIndex(h => h.is_current));
-        setHistoryDescriptions(history.map(h => h.description || ''));
+        // Check if the first history item is already an initial upload
+        const isFirstHistoryInitial = history[0].description === 'Initial data upload';
+        
+        // Combine initial data with history, avoiding duplicates
+        const combinedHistory = isFirstHistoryInitial 
+          ? history.map(h => ({ ...h, version: h.version }))
+          : [
+              { data: initialData.data, description: 'Initial data upload', is_current: false, version: 1 },
+              ...history.map(h => ({ ...h, version: h.version }))
+            ];
+        
+        // Set the data history based on combined versions
+        setDataHistory(combinedHistory.map(h => h.data));
+        setCurrentHistoryIndex(combinedHistory.findIndex(h => h.is_current) || 0);
+        setHistoryDescriptions(combinedHistory.map(h => h.description || ''));
+        setVersionNumbers(combinedHistory.map(h => h.version));
         
         // Set the current data (most recent version)
-        const currentVersionIndex = history.findIndex(h => h.is_current);
-        setUploadedData(history[currentVersionIndex].data);
-        setFilterDescription(history[currentVersionIndex].description || '');
+        const currentVersionIndex = combinedHistory.findIndex(h => h.is_current) || 0;
+        setUploadedData(combinedHistory[currentVersionIndex].data);
+        setFilterDescription(combinedHistory[currentVersionIndex].description || '');
 
         // Initialize visible columns when file is selected
         const initialVisible = {};
-        Object.keys(history[0].data[0] || {}).forEach(column => {
+        Object.keys(combinedHistory[0].data[0] || {}).forEach(column => {
           initialVisible[column] = true;
         });
         setVisibleColumns(initialVisible);
       } else {
-        // If no history exists, fetch the current file data
-        const dataResponse = await fetch(`${config.baseUrl}/api/data/${file.id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          credentials: 'include'
-        });
-        
-        if (!dataResponse.ok) {
-          throw new Error('Failed to fetch file data');
-        }
-        
-        const data = await dataResponse.json();
-        
-        // Initialize with the current data as the first history entry
-        setDataHistory([data.data]);
+        // If no history exists, use just the initial data
+        setDataHistory([initialData.data]);
         setCurrentHistoryIndex(0);
-        setHistoryDescriptions(['Initial data load']);
-        setUploadedData(data.data);
-        setFilterDescription('Initial data load');
+        setHistoryDescriptions(['Initial data upload']);
+        setVersionNumbers([1]);
+        setUploadedData(initialData.data);
+        setFilterDescription('Initial data upload');
 
         // Initialize visible columns
         const initialVisible = {};
-        Object.keys(data.data[0] || {}).forEach(column => {
+        Object.keys(initialData.data[0] || {}).forEach(column => {
           initialVisible[column] = true;
         });
         setVisibleColumns(initialVisible);
@@ -298,6 +315,52 @@ function Dashboard({ onLogout }) {
     setCurrentHistoryIndex(index);
     setUploadedData(dataHistory[index]);
     setShowHistoryPopup(false);
+  };
+
+  const handleDeleteVersion = async (version) => {
+    if (!selectedFile) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.baseUrl}/api/data/history/${selectedFile.id}/${version}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete version');
+      }
+      
+      // Refresh the file data to get updated history
+      await handleFileSelect(selectedFile);
+      
+    } catch (error) {
+      console.error('Error deleting version:', error);
+      setError(error.message);
+    }
+  };
+
+  const handleDeleteClick = (version) => {
+    setVersionToDelete(version);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (versionToDelete) {
+      handleDeleteVersion(versionToDelete);
+    }
+    setShowDeleteConfirm(false);
+    setVersionToDelete(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+    setVersionToDelete(null);
   };
 
   const renderDataTable = () => {
@@ -721,14 +784,14 @@ function Dashboard({ onLogout }) {
         zIndex: 1000
       }}>
         <div style={{
-          backgroundColor: 'var(--background-light)',
+          backgroundColor: 'var(--white)',
           padding: '2rem',
           borderRadius: '8px',
-          width: '80%',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
           maxWidth: '600px',
+          width: '90%',
           maxHeight: '80vh',
-          overflow: 'auto',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          overflow: 'auto'
         }}>
           <div style={{
             display: 'flex',
@@ -756,23 +819,135 @@ function Dashboard({ onLogout }) {
             gap: '0.5rem'
           }}>
             {dataHistory.map((_, index) => (
-              <button
+              <div
                 key={index}
-                onClick={() => handleHistoryClick(index)}
                 style={{
-                  padding: '1rem',
-                  backgroundColor: index === currentHistoryIndex ? 'var(--primary-color)' : 'var(--white)',
-                  color: index === currentHistoryIndex ? 'var(--white)' : 'var(--text-dark)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
                 }}
               >
-                {historyDescriptions[index] || `Edit ${index + 1}`}
-              </button>
+                <button
+                  onClick={() => handleHistoryClick(index)}
+                  style={{
+                    flex: 1,
+                    padding: '1rem',
+                    backgroundColor: index === currentHistoryIndex ? 'var(--primary-color)' : 'var(--white)',
+                    color: index === currentHistoryIndex ? 'var(--white)' : 'var(--text-dark)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {historyDescriptions[index] || `Edit ${versionNumbers[index]}`}
+                </button>
+                {index > 0 && versionNumbers[index] > 1 && (
+                  <button
+                    onClick={() => handleDeleteClick(versionNumbers[index])}
+                    style={{
+                      padding: '0.5rem',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: 'var(--error)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = 'var(--error-dark)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = 'var(--error)';
+                    }}
+                  >
+                    <i className="fas fa-trash" style={{ fontSize: '1rem' }}></i>
+                  </button>
+                )}
+              </div>
             ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDeleteConfirm = () => {
+    if (!showDeleteConfirm) return null;
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1001
+      }}>
+        <div style={{
+          backgroundColor: 'var(--white)',
+          padding: '2rem',
+          borderRadius: '8px',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          maxWidth: '400px',
+          width: '90%'
+        }}>
+          <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Delete Version</h3>
+          <p style={{ color: 'var(--text-dark)', marginBottom: '1.5rem' }}>
+            Are you sure you want to delete this version? This action cannot be undone.
+          </p>
+          <div style={{
+            display: 'flex',
+            gap: '1rem',
+            justifyContent: 'flex-end'
+          }}>
+            <button
+              onClick={handleDeleteCancel}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: 'var(--white)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                color: 'var(--text-dark)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--background-light)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--white)';
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteConfirm}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: 'var(--error)',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                color: 'var(--white)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--error-dark)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--error)';
+              }}
+            >
+              Delete
+            </button>
           </div>
         </div>
       </div>
@@ -871,6 +1046,7 @@ function Dashboard({ onLogout }) {
         </div>
       </div>
       {renderHistoryPopup()}
+      {renderDeleteConfirm()}
     </div>
   );
 }

@@ -87,19 +87,48 @@ def get_data_db():
 
 def get_next_table_name(db: Session, base_name: str) -> str:
     """Get the next available table name in the sequence file_edit_1, file_edit_2, etc."""
-    i = 1
-    while True:
-        new_name = f"{base_name}_edit_{i}"
-        # Check if table exists using parameterized query
-        with data_engine.connect() as connection:
-            result = connection.execute(
-                text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :table_name)"),
-                {"table_name": new_name}
-            )
-            exists = result.scalar()
-        if not exists:
-            return new_name
-        i += 1
+    # Extract the base name without any existing edit suffixes
+    base_name = base_name.split('_edit_')[0]
+    
+    # Find the highest existing version number
+    with data_engine.connect() as connection:
+        result = connection.execute(
+            text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name LIKE :pattern
+                ORDER BY table_name DESC
+                LIMIT 1
+            """),
+            {"pattern": f"{base_name}_edit_%"}
+        )
+        last_table = result.scalar()
+        
+        if last_table:
+            # Extract the version number from the last table name
+            try:
+                last_version = int(last_table.split('_edit_')[-1])
+                new_version = last_version + 1
+            except ValueError:
+                new_version = 1
+        else:
+            new_version = 1
+            
+        new_name = f"{base_name}_edit_{new_version}"
+        
+        # Verify the new name doesn't exist (just to be safe)
+        result = connection.execute(
+            text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :table_name)"),
+            {"table_name": new_name}
+        )
+        exists = result.scalar()
+        
+        if exists:
+            # If by some chance the table exists, try the next number
+            new_version += 1
+            new_name = f"{base_name}_edit_{new_version}"
+            
+        return new_name
 
 def create_new_table_from_query(db: Session, source_table: str, new_table: str, query: str, params: Dict[str, Any]) -> None:
     """Create a new table from the results of a query on the source table."""
@@ -728,4 +757,79 @@ async def get_version_history(
 
         return version_data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching version history: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error fetching version history: {str(e)}")
+
+@router.delete("/api/data/history/{file_id}/{version}")
+async def delete_version(
+    file_id: int,
+    version: int,
+    current_user=Depends(get_current_user),
+    user_db: Session = Depends(get_user_db),
+    data_db: Session = Depends(get_data_db)
+):
+    """Delete a specific version of a file (if owned by the current user)"""
+    try:
+        # Check ownership using user_db
+        file_record = user_db.query(File).filter(
+            File.id == file_id,
+            File.user_id == current_user.id
+        ).first()
+        if not file_record:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Get the version to delete
+        version_to_delete = data_db.query(TableVersion).filter(
+            TableVersion.file_id == file_id,
+            TableVersion.version == version
+        ).first()
+        
+        if not version_to_delete:
+            raise HTTPException(status_code=404, detail="Version not found")
+            
+        # Don't allow deleting the initial version (version 1)
+        if version == 1:
+            raise HTTPException(status_code=400, detail="Cannot delete the initial version")
+            
+        # If this is the current version, we need to set a new current version
+        if version_to_delete.is_current:
+            # Find the previous version
+            prev_version = data_db.query(TableVersion).filter(
+                TableVersion.file_id == file_id,
+                TableVersion.version < version
+            ).order_by(TableVersion.version.desc()).first()
+            
+            if not prev_version:
+                raise HTTPException(status_code=400, detail="Cannot delete the only remaining version")
+                
+            # Set the previous version as current
+            prev_version.is_current = True
+            file_record.file_path = prev_version.table_name
+            user_db.commit()
+        
+        # Get the table name before deleting the version record
+        table_name = version_to_delete.table_name
+        
+        # Delete the version from the database
+        data_db.delete(version_to_delete)
+        data_db.commit()
+        
+        # Drop the table
+        with data_engine.connect() as conn:
+            try:
+                conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
+                conn.commit()
+            except Exception as e:
+                logger.error(f"Error dropping table {table_name}: {str(e)}")
+                # Continue with the response even if table drop fails
+                # The table might have already been dropped or not exist
+        
+        return {"message": f"Version {version} deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting version: {str(e)}")
+        # Rollback any pending changes
+        data_db.rollback()
+        user_db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting version: {str(e)}") 

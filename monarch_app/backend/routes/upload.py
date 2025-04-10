@@ -1,7 +1,7 @@
 from utils.imports import *
-from database.tables import User, File as DBFile
+from database.tables import User, File as DBFile, TableVersion
 from routes.auth import get_current_user
-from database.files import engine as data_engine
+from database.files import engine as data_engine, DataSessionLocal
 from database.users import SessionLocal
 from utils.clean_head import clean_header_csv, clean_header_xlsx
 from utils.sanitize import sanitize_table_name, sanitize_dataframe
@@ -21,12 +21,20 @@ def get_db():
     finally:
         db.close()
 
+def get_data_db():
+    db = DataSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 @router.post("/api/data/upload/")
 async def upload_file(
     file: UploadFile = File(...),
     column_names: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_db)
 ):
     
     if file.filename.endswith(('.csv', '.xlsx', '.json', '.pdf', '.txt', '.jsonl')) :
@@ -189,6 +197,17 @@ async def upload_file(
                 db.commit()
                 db.refresh(new_file)
 
+                # Create initial version entry
+                initial_version = TableVersion(
+                    file_id=new_file.id,
+                    table_name=table_name,
+                    version=1,
+                    is_current=True,
+                    description="Initial data upload"
+                )
+                data_db.add(initial_version)
+                data_db.commit()
+
                 return JSONResponse({
                     "message": "File processed",
                     "data": records,
@@ -196,6 +215,7 @@ async def upload_file(
                 })
             except SQLAlchemyError as e:
                 db.rollback()
+                data_db.rollback()
                 raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
         except Exception as e:
