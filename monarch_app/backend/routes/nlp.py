@@ -17,6 +17,7 @@ import json
 import re
 from enum import Enum
 import pandas as pd
+import numpy
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
