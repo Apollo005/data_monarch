@@ -103,7 +103,7 @@ const Sidebar = ({ onFileSelect }) => {
         borderRadius: "1rem",
         border: "1px solid var(--border-color)",
         padding: isCollapsed ? "0.5rem" : "1.5rem",
-        backgroundColor: "var(--white)",
+        backgroundColor: "var(--card-bg)",
         boxShadow: "2px 0 5px rgba(0, 0, 0, 0.05)",
         transition: "all 0.3s ease",
         position: "relative",

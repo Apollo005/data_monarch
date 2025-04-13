@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import FileUpload from './FileUpload';
 import Sidebar from './SideBar';
 import ThemeToggle from './components/ThemeToggle';
+import DataTable from './DataTable';
 import config from './config';
 import './styles/global.css';
 import 'font-awesome/css/font-awesome.min.css';
@@ -23,6 +24,7 @@ function Dashboard({ onLogout }) {
   const [dataHistory, setDataHistory] = useState([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [showHistoryPopup, setShowHistoryPopup] = useState(false);
+  const [showOriginalDataPopup, setShowOriginalDataPopup] = useState(false);
   const [historyDescriptions, setHistoryDescriptions] = useState([]);
   const [versionToDelete, setVersionToDelete] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -190,7 +192,7 @@ function Dashboard({ onLogout }) {
         setVisibleColumns(initialVisible);
       }
 
-      setActiveTab('view');
+      setActiveTab('upload');
 
     } catch (error) {
       console.error('Error loading file:', error);
@@ -202,7 +204,6 @@ function Dashboard({ onLogout }) {
 
   const tabs = [
     { id: 'upload', label: 'Upload Data' },
-    { id: 'view', label: 'View Data' },
     { id: 'filter', label: 'Filter Data' },
     { id: 'analyze', label: 'Analyze Data' },
     { id: 'visualize', label: 'Visualize' },
@@ -513,42 +514,12 @@ function Dashboard({ onLogout }) {
     switch (activeTab) {
       case 'upload':
         return (
-          <FileUpload 
-            onDataUpload={handleDataUpload}
-            existingData={uploadedData}
-          />
-        );
-      case 'view':
-        return (
           <div className="p-6">
-            <h2 className="text-2xl font-bold mb-4">View Data</h2>
-            {uploadedData && uploadedData.length > 0 ? (
-              renderDataTable()
-            ) : (
-              <p className="text-gray-500">No data available. Please upload a file or select one from your history.</p>
-            )}
-          </div>
-        );
-      case 'clean':
-        return (
-          <div className="card">
-            {uploadedData ? (
-              <div>
-                <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Clean Data</h3>
-                <p>Data cleaning functionality coming soon...</p>
-              </div>
-            ) : (
-              <div>
-                <p style={{ color: 'var(--error)' }}>Please upload data first before cleaning.</p>
-                <button 
-                  onClick={() => setActiveTab('upload')}
-                  className="btn btn-primary"
-                  style={{ marginTop: '1rem' }}
-                >
-                  Go to Upload
-                </button>
-              </div>
-            )}
+            <h2 className="text-2xl font-bold mb-4">Upload Data</h2>
+            <FileUpload 
+              onDataUpload={handleDataUpload}
+              existingData={uploadedData}
+            />
           </div>
         );
       case 'filter':
@@ -563,65 +534,32 @@ function Dashboard({ onLogout }) {
                   marginBottom: '1rem'
                 }}>
                   <h3 style={{ color: 'var(--text-dark)', margin: 0 }}>Filter Data</h3>
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.5rem'
-                  }}>
-                    <button
-                      onClick={() => setShowHistoryPopup(true)}
-                      className="btn"
-                      style={{
-                        backgroundColor: 'var(--primary-color)',
-                        color: 'var(--white)',
-                        border: 'none',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <i className="fas fa-history" style={{ fontSize: '1.5rem' }}></i>
-                    </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                       onClick={handleUndo}
                       disabled={currentHistoryIndex <= 0}
-                      className="btn"
+                      className="btn header-controls"
                       style={{
-                        backgroundColor: currentHistoryIndex <= 0 ? 'var(--background-light)' : 'var(--primary-color)',
+                        backgroundColor: currentHistoryIndex <= 0 ? 'var(--background-light)' : 'var(--primary-dark)',
                         color: currentHistoryIndex <= 0 ? 'var(--text-light)' : 'var(--white)',
-                        border: 'none',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '4px',
                         cursor: currentHistoryIndex <= 0 ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s ease'
+                        opacity: currentHistoryIndex <= 0 ? 0.5 : 1
                       }}
                     >
-                      ↩ Undo
+                      <i className="fas fa-undo"></i>
                     </button>
                     <button
                       onClick={handleRedo}
                       disabled={currentHistoryIndex >= dataHistory.length - 1}
-                      className="btn"
+                      className="btn header-controls"
                       style={{
-                        backgroundColor: currentHistoryIndex >= dataHistory.length - 1 ? 'var(--background-light)' : 'var(--primary-color)',
+                        backgroundColor: currentHistoryIndex >= dataHistory.length - 1 ? 'var(--background-light)' : 'var(--primary-dark)',
                         color: currentHistoryIndex >= dataHistory.length - 1 ? 'var(--text-light)' : 'var(--white)',
-                        border: 'none',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '4px',
                         cursor: currentHistoryIndex >= dataHistory.length - 1 ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s ease'
+                        opacity: currentHistoryIndex >= dataHistory.length - 1 ? 0.5 : 1
                       }}
                     >
-                      ↪ Redo
+                      <i className="fas fa-redo"></i>
                     </button>
                   </div>
                 </div>
@@ -647,16 +585,7 @@ function Dashboard({ onLogout }) {
                 <button
                   onClick={handleFilterSubmit}
                   disabled={isFiltering || !filterQuery.trim()}
-                  style={{
-                    backgroundColor: 'var(--primary-color)',
-                    color: 'var(--white)',
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '4px',
-                    border: 'none',
-                    cursor: isFiltering || !filterQuery.trim() ? 'not-allowed' : 'pointer',
-                    opacity: isFiltering || !filterQuery.trim() ? 0.7 : 1,
-                    marginBottom: '1rem'
-                  }}
+                  className="btn apply-filter-btn"
                 >
                   {isFiltering ? 'Applying Filter...' : 'Apply Filter'}
                 </button>
@@ -681,6 +610,20 @@ function Dashboard({ onLogout }) {
                     {error}
                   </div>
                 )}
+                <div className="filter-controls">
+                  <button
+                    onClick={() => setShowHistoryPopup(true)}
+                    className="btn"
+                  >
+                    <i className="fas fa-history"></i>
+                  </button>
+                  <button
+                    onClick={() => setShowOriginalDataPopup(true)}
+                    className="btn"
+                  >
+                    <i className="fas fa-table"></i>
+                  </button>
+                </div>
               </div>
             ) : (
               <div>
@@ -864,7 +807,7 @@ function Dashboard({ onLogout }) {
                       e.currentTarget.style.color = 'var(--error)';
                     }}
                   >
-                    <i className="fas fa-trash" style={{ fontSize: '1rem' }}></i>
+                    <span style={{ fontSize: "1.2rem" }}>🗑️</span>
                   </button>
                 )}
               </div>
@@ -954,6 +897,58 @@ function Dashboard({ onLogout }) {
     );
   };
 
+  const renderOriginalDataPopup = () => {
+    if (!showOriginalDataPopup) return null;
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000
+      }}>
+        <div style={{
+          backgroundColor: 'var(--white)',
+          padding: '2rem',
+          borderRadius: '8px',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          maxWidth: '90%',
+          width: '90%',
+          maxHeight: '80vh',
+          overflow: 'auto'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem'
+          }}>
+            <h3 style={{ color: 'var(--text-dark)', margin: 0 }}>Current Data</h3>
+            <button
+              onClick={() => setShowOriginalDataPopup(false)}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: 'var(--text-dark)',
+                cursor: 'pointer',
+                fontSize: '1.5rem'
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <DataTable data={dataHistory[currentHistoryIndex]} />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="dashboard">
       <nav className="navbar" style={{ 
@@ -991,13 +986,7 @@ function Dashboard({ onLogout }) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="btn"
-                style={{
-                  backgroundColor: activeTab === tab.id ? 'var(--primary-color)' : 'var(--white)',
-                  color: activeTab === tab.id ? 'var(--white)' : 'var(--text-dark)',
-                  border: activeTab === tab.id ? 'none' : '1px solid var(--border-color)',
-                  whiteSpace: 'nowrap'
-                }}
+                className={`btn tab-btn ${activeTab === tab.id ? 'active' : ''}`}
               >
                 {tab.label}
               </button>
@@ -1047,6 +1036,7 @@ function Dashboard({ onLogout }) {
       </div>
       {renderHistoryPopup()}
       {renderDeleteConfirm()}
+      {renderOriginalDataPopup()}
     </div>
   );
 }
