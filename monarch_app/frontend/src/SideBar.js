@@ -108,6 +108,9 @@ const Sidebar = ({ onFileSelect }) => {
         transition: "all 0.3s ease",
         position: "relative",
         overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        height: "calc(100vh - 4rem)", // Subtract navbar height
       }}
     >
       {/* Toggle button at the top-left */}
@@ -153,6 +156,7 @@ const Sidebar = ({ onFileSelect }) => {
           marginTop: "3rem",
           opacity: isCollapsed ? 0 : 1,
           transition: "opacity 0.3s ease",
+          flexShrink: 0, // Prevent header from shrinking
         }}
       >
         <div
@@ -166,10 +170,11 @@ const Sidebar = ({ onFileSelect }) => {
           <h2
             style={{
               color: "var(--text-dark)",
-              fontSize: "1.5rem",
+              fontSize: "1.1rem",
               fontWeight: "600",
               margin: 0,
               whiteSpace: "nowrap",
+              textAlign: "center",
             }}
           >
             My Uploaded Files
@@ -178,35 +183,35 @@ const Sidebar = ({ onFileSelect }) => {
             onClick={handleNewUpload}
             style={{
                 position: "absolute",
-                top: "1rem", // Adjusted position to not overlap other content
-                right: "1rem", // Adjusted position to align the button
-                width: "36px", // Same size as the toggle button
-                height: "36px", // Same size as the toggle button
-                borderRadius: "50%", // Round shape like the toggle button
-                backgroundColor: "var(--primary-color)", // Matching background color
+                top: "1rem",
+                right: "1rem",
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                backgroundColor: "var(--primary-color)",
                 border: "none",
-                color: "var(--white)", // White text
+                color: "var(--white)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
                 zIndex: 10,
-                fontSize: "1.2rem", // Font size for the "+" symbol
-                boxShadow: "0 0 8px var(--primary-light)", // Shadow for depth
-                transition: "transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease", // Transition on hover
+                fontSize: "1.2rem",
+                boxShadow: "0 0 8px var(--primary-light)",
+                transition: "transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease",
             }}
             onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "rotate(90deg) scale(1.1)"; // Rotate on hover
-                e.currentTarget.style.backgroundColor = "var(--primary-dark)"; // Darker shade on hover
-                e.currentTarget.style.boxShadow = "0 0 12px var(--primary-color)"; // Stronger shadow on hover
+                e.currentTarget.style.transform = "rotate(90deg) scale(1.1)";
+                e.currentTarget.style.backgroundColor = "var(--primary-dark)";
+                e.currentTarget.style.boxShadow = "0 0 12px var(--primary-color)";
             }}
             onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "rotate(0deg) scale(1)"; // Reset rotation and scale
-                e.currentTarget.style.backgroundColor = "var(--primary-color)"; // Reset background color
-                e.currentTarget.style.boxShadow = "0 0 8px var(--primary-light)"; // Reset shadow
+                e.currentTarget.style.transform = "rotate(0deg) scale(1)";
+                e.currentTarget.style.backgroundColor = "var(--primary-color)";
+                e.currentTarget.style.boxShadow = "0 0 8px var(--primary-light)";
             }}
           >
-            <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>+</span> {/* Adjusted size for "+" */}
+            <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>+</span>
           </button>
         </div>
 
@@ -220,7 +225,18 @@ const Sidebar = ({ onFileSelect }) => {
             {error}
           </p>
         )}
+      </div>
 
+      {/* Scrollable content area */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          paddingRight: "0.5rem", // Add some padding for the scrollbar
+          opacity: isCollapsed ? 0 : 1,
+          transition: "opacity 0.3s ease",
+        }}
+      >
         {/* List of files */}
         {files.length > 0 ? (
           <ul

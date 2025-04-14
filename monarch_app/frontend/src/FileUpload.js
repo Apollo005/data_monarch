@@ -96,130 +96,130 @@ const FileUpload = ({ onDataUpload, existingData }) => {
 
   return (
     <div className="file-upload-container">
-      <div className="card" style={{ marginBottom: '2rem' }}>
-        <h2 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>Upload a File</h2>
-        
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column',
-          gap: '1rem',
-          marginBottom: '1rem'
-        }}>
+      {!fileData ? (
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>Upload a File</h2>
+          
           <div style={{ 
             display: 'flex', 
-            alignItems: 'center', 
+            flexDirection: 'column',
             gap: '1rem',
-            flexWrap: 'wrap'
+            marginBottom: '1rem'
           }}>
-            <div className="file-input-wrapper" style={{ flex: 1, minWidth: '200px' }}>
-              <input
-                type="file"
-                onChange={handleFileChange}
-                ref={fileInputRef}
-                id="file-input"
-                accept=".csv,.txt,.xlsx,.xls"
-              />
-              <label htmlFor="file-input" className="file-input-label">
-                Choose File
-              </label>
-              {file && <span className="file-name">{file.name}</span>}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '1rem',
+              flexWrap: 'wrap'
+            }}>
+              <div className="file-input-wrapper" style={{ flex: 1, minWidth: '200px' }}>
+                <input
+                  type="file"
+                  onChange={handleFileChange}
+                  ref={fileInputRef}
+                  id="file-input"
+                  accept=".csv,.txt,.xlsx,.xls"
+                />
+                <label htmlFor="file-input" className="file-input-label">
+                  Choose File
+                </label>
+                {file && <span className="file-name">{file.name}</span>}
+              </div>
+
+              <button 
+                onClick={handleUpload}
+                className="btn btn-primary"
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                Upload
+              </button>
             </div>
 
-            <button 
-              onClick={handleUpload}
-              className="btn btn-primary"
-              style={{ whiteSpace: 'nowrap' }}
-            >
-              Upload
-            </button>
-          </div>
-
-          {showColumnInput && (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
-              width: '100%'
-            }}>
-              <label 
-                htmlFor="column-names"
-                style={{
-                  color: 'var(--text-dark)',
-                  fontSize: '0.9rem',
-                  fontWeight: '500'
-                }}
-              >
-                Column Names (comma-separated)
-              </label>
+            {showColumnInput && (
               <div style={{
-                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
                 width: '100%'
               }}>
-                <input
-                  type="text"
-                  id="column-names"
-                  value={columnNames}
-                  onChange={handleColumnNamesChange}
-                  placeholder="e.g., Name, Age, Email, Phone"
+                <label 
+                  htmlFor="column-names"
                   style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '8px',
-                    border: columnError ? '2px solid var(--error)' : '1px solid var(--border-color)',
-                    backgroundColor: 'var(--white)',
                     color: 'var(--text-dark)',
                     fontSize: '0.9rem',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+                    fontWeight: '500'
                   }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = 'var(--primary-color)';
-                    e.target.style.boxShadow = '0 0 0 2px var(--primary-color-light)';
-                  }}
-                  onBlur={(e) => {
-                    if (!columnError) {
-                      e.target.style.borderColor = 'var(--border-color)';
-                      e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                    }
-                  }}
-                />
+                >
+                  Column Names (comma-separated)
+                </label>
+                <div style={{
+                  position: 'relative',
+                  width: '100%'
+                }}>
+                  <input
+                    type="text"
+                    id="column-names"
+                    value={columnNames}
+                    onChange={handleColumnNamesChange}
+                    placeholder="e.g., Name, Age, Email, Phone"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '8px',
+                      border: columnError ? '2px solid var(--error)' : '1px solid var(--border-color)',
+                      backgroundColor: 'var(--white)',
+                      color: 'var(--text-dark)',
+                      fontSize: '0.9rem',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'var(--primary-color)';
+                      e.target.style.boxShadow = '0 0 0 2px var(--primary-color-light)';
+                    }}
+                    onBlur={(e) => {
+                      if (!columnError) {
+                        e.target.style.borderColor = 'var(--border-color)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                      }
+                    }}
+                  />
+                  {columnError && (
+                    <div style={{
+                      position: 'absolute',
+                      right: '1rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--error)',
+                      fontSize: '1.2rem'
+                    }}>
+                      ⚠️
+                    </div>
+                  )}
+                </div>
                 {columnError && (
-                  <div style={{
-                    position: 'absolute',
-                    right: '1rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
+                  <p style={{
                     color: 'var(--error)',
-                    fontSize: '1.2rem'
+                    fontSize: '0.85rem',
+                    margin: 0
                   }}>
-                    ⚠️
-                  </div>
+                    {columnError}
+                  </p>
                 )}
               </div>
-              {columnError && (
-                <p style={{
-                  color: 'var(--error)',
-                  fontSize: '0.85rem',
-                  margin: 0
-                }}>
-                  {columnError}
-                </p>
-              )}
-            </div>
+            )}
+          </div>
+
+          {message && (
+            <p style={{ 
+              color: message.includes("failed") || message.includes("expired") ? "var(--error)" : "var(--success)",
+              fontWeight: "500"
+            }}>
+              {message}
+            </p>
           )}
         </div>
-
-        {message && (
-          <p style={{ 
-            color: message.includes("failed") || message.includes("expired") ? "var(--error)" : "var(--success)",
-            fontWeight: "500"
-          }}>
-            {message}
-          </p>
-        )}
-      </div>
-
-      {fileData && (
+      ) : (
         <div className="card">
           <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Data Preview</h3>
           <DataTable data={fileData} />

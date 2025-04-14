@@ -515,7 +515,6 @@ function Dashboard({ onLogout }) {
       case 'upload':
         return (
           <div className="p-6">
-            <h2 className="text-2xl font-bold mb-4">Upload Data</h2>
             <FileUpload 
               onDataUpload={handleDataUpload}
               existingData={uploadedData}
@@ -956,7 +955,7 @@ function Dashboard({ onLogout }) {
         justifyContent: 'space-between', 
         alignItems: 'center',
         padding: '1rem',
-        backgroundColor: 'var(--white)',
+        backgroundColor: 'var(--card-bg)',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
         marginBottom: '2rem'
       }}>
@@ -966,9 +965,28 @@ function Dashboard({ onLogout }) {
         </div>
         <button 
           onClick={handleLogout}
-          className="btn btn-danger"
+          style={{
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: 'var(--primary-dark)',
+            cursor: 'pointer',
+            fontSize: '1.5rem',
+            padding: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--error)';
+            e.currentTarget.style.transform = 'scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--primary-dark)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
         >
-          Logout
+          <i className="fas fa-sign-out-alt"></i>
         </button>
       </nav>
 

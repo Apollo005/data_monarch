@@ -229,6 +229,35 @@ def parse_condition(condition: str) -> Tuple[str, str, str]:
     # Remove any quotes around the value
     condition = condition.strip()
     
+    # Handle BETWEEN conditions
+    if "BETWEEN" in condition.upper():
+        parts = condition.split("BETWEEN")
+        if len(parts) != 2:
+            raise ValueError("Invalid BETWEEN condition format")
+        
+        column = parts[0].strip()
+        # Remove quotes if present
+        if column.startswith(('"', "'")) and column.endswith(('"', "'")):
+            column = column[1:-1]
+        if not column:
+            raise ValueError("Empty column name in BETWEEN condition")
+        
+        # Split the range values
+        range_values = parts[1].strip().split("AND")
+        if len(range_values) != 2:
+            raise ValueError("Invalid BETWEEN range format")
+        
+        min_val = range_values[0].strip()
+        max_val = range_values[1].strip()
+        
+        # Remove quotes if present
+        if min_val.startswith(("'", '"')) and min_val.endswith(("'", '"')):
+            min_val = min_val[1:-1]
+        if max_val.startswith(("'", '"')) and max_val.endswith(("'", '"')):
+            max_val = max_val[1:-1]
+            
+        return column, "BETWEEN", f"{min_val} AND {max_val}"
+    
     # Handle IS NULL and IS NOT NULL cases
     if "IS NULL" in condition.upper():
         parts = condition.split("IS NULL")
@@ -299,6 +328,10 @@ def sanitize_query(query: str) -> str:
             # Quote column names - use single quotes to avoid conflicts with SQL string quotes
             if value is None:
                 sanitized_conditions.append(f'"{column}" {operator}')
+            elif operator == "BETWEEN":
+                # For BETWEEN, we need to handle the range values separately
+                min_val, max_val = value.split(" AND ")
+                sanitized_conditions.append(f'"{column}" {operator} :val_{len(sanitized_conditions)} AND :val_{len(sanitized_conditions) + 1}')
             else:
                 sanitized_conditions.append(f'"{column}" {operator} :val_{len(sanitized_conditions)}')
         except ValueError as e:
