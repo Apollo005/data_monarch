@@ -4,6 +4,8 @@ import FileUpload from './FileUpload';
 import Sidebar from './SideBar';
 import ThemeToggle from './components/ThemeToggle';
 import DataTable from './DataTable';
+import DataVisualization from './components/DataVisualization';
+import DataAnalysis from './components/DataAnalysis';
 import config from './config';
 import './styles/global.css';
 import 'font-awesome/css/font-awesome.min.css';
@@ -29,6 +31,7 @@ function Dashboard({ onLogout }) {
   const [versionToDelete, setVersionToDelete] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [versionNumbers, setVersionNumbers] = useState([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleLogout = () => {
     onLogout();
@@ -364,6 +367,10 @@ function Dashboard({ onLogout }) {
     setVersionToDelete(null);
   };
 
+  const handleSidebarToggle = (collapsed) => {
+    setIsSidebarCollapsed(collapsed);
+  };
+
   const renderDataTable = () => {
     if (!uploadedData) return null;
 
@@ -514,11 +521,8 @@ function Dashboard({ onLogout }) {
     switch (activeTab) {
       case 'upload':
         return (
-          <div className="p-6">
-            <FileUpload 
-              onDataUpload={handleDataUpload}
-              existingData={uploadedData}
-            />
+          <div className="card">
+            <FileUpload onDataUpload={handleDataUpload} existingData={uploadedData} />
           </div>
         );
       case 'filter':
@@ -641,67 +645,20 @@ function Dashboard({ onLogout }) {
       case 'analyze':
         return (
           <div className="card">
-            {uploadedData ? (
-              <div>
-                <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Analyze Data</h3>
-                <p>Data analysis functionality coming soon...</p>
-              </div>
-            ) : (
-              <div>
-                <p style={{ color: 'var(--error)' }}>Please upload data first before analyzing.</p>
-                <button 
-                  onClick={() => setActiveTab('upload')}
-                  className="btn btn-primary"
-                  style={{ marginTop: '1rem' }}
-                >
-                  Go to Upload
-                </button>
-              </div>
-            )}
+            <DataAnalysis data={uploadedData} />
           </div>
         );
       case 'visualize':
         return (
           <div className="card">
-            {uploadedData ? (
-              <div>
-                <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Visualize Data</h3>
-                <p>Data visualization functionality coming soon...</p>
-              </div>
-            ) : (
-              <div>
-                <p style={{ color: 'var(--error)' }}>Please upload data first before visualizing.</p>
-                <button 
-                  onClick={() => setActiveTab('upload')}
-                  className="btn btn-primary"
-                  style={{ marginTop: '1rem' }}
-                >
-                  Go to Upload
-                </button>
-              </div>
-            )}
+            <DataVisualization data={uploadedData} />
           </div>
         );
       case 'export':
         return (
           <div className="card">
-            {uploadedData ? (
-              <div>
-                <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Export Data</h3>
-                <p>Data export functionality coming soon...</p>
-              </div>
-            ) : (
-              <div>
-                <p style={{ color: 'var(--error)' }}>Please upload data first before exporting.</p>
-                <button 
-                  onClick={() => setActiveTab('upload')}
-                  className="btn btn-primary"
-                  style={{ marginTop: '1rem' }}
-                >
-                  Go to Upload
-                </button>
-              </div>
-            )}
+            <h2>Export Data</h2>
+            <p>Export functionality coming soon...</p>
           </div>
         );
       default:
@@ -713,105 +670,116 @@ function Dashboard({ onLogout }) {
     if (!showHistoryPopup) return null;
 
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'var(--white)',
-          padding: '2rem',
-          borderRadius: '8px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          maxWidth: '600px',
-          width: '90%',
-          maxHeight: '80vh',
-          overflow: 'auto'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '1rem'
-          }}>
-            <h3 style={{ color: 'var(--text-dark)', margin: 0 }}>Edit History</h3>
-            <button
-              onClick={() => setShowHistoryPopup(false)}
+      <div
+        style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          backgroundColor: "var(--white)",
+          padding: "2rem",
+          borderRadius: "8px",
+          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+          width: "80%",
+          maxWidth: "600px",
+          maxHeight: "80vh",
+          overflow: "auto",
+          zIndex: 1000
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+          <h2 style={{ color: "var(--text-dark)", margin: 0 }}>Filter History</h2>
+          <button
+            onClick={() => setShowHistoryPopup(false)}
+            style={{
+              backgroundColor: "transparent",
+              border: "none",
+              color: "var(--text-light)",
+              cursor: "pointer",
+              fontSize: "1.5rem",
+              padding: "0.5rem"
+            }}
+          >
+            <i className="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {versionNumbers.map((version, index) => (
+            <div
+              key={index}
               style={{
-                backgroundColor: 'transparent',
-                border: 'none',
-                color: 'var(--text-dark)',
-                cursor: 'pointer',
-                fontSize: '1.5rem'
+                backgroundColor: "var(--background-light)",
+                padding: "1rem",
+                borderRadius: "8px",
+                border: "1px solid var(--border-color)",
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+              onClick={() => handleHistoryClick(index)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
               }}
             >
-              ×
-            </button>
-          </div>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem'
-          }}>
-            {dataHistory.map((_, index) => (
-              <div
-                key={index}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ 
+                    backgroundColor: "var(--primary-color)", 
+                    color: "var(--white)", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "4px",
+                    fontSize: "0.875rem",
+                    fontWeight: "500"
+                  }}>
+                    Version {version}
+                  </span>
+                  {index === versionNumbers.length - 1 && (
+                    <span style={{ 
+                      backgroundColor: "var(--success)", 
+                      color: "var(--white)", 
+                      padding: "0.25rem 0.5rem", 
+                      borderRadius: "4px",
+                      fontSize: "0.875rem",
+                      fontWeight: "500"
+                    }}>
+                      Current
+                    </span>
+                  )}
+                </div>
                 <button
-                  onClick={() => handleHistoryClick(index)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(version);
+                  }}
                   style={{
-                    flex: 1,
-                    padding: '1rem',
-                    backgroundColor: index === currentHistoryIndex ? 'var(--primary-color)' : 'var(--white)',
-                    color: index === currentHistoryIndex ? 'var(--white)' : 'var(--text-dark)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.2s ease'
+                    backgroundColor: "transparent",
+                    border: "none",
+                    color: "var(--error)",
+                    cursor: "pointer",
+                    padding: "0.25rem 0.5rem",
+                    borderRadius: "4px",
+                    transition: "all 0.2s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--error-light)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
-                  {historyDescriptions[index] || `Edit ${versionNumbers[index]}`}
+                  <i className="fas fa-trash"></i>
                 </button>
-                {index > 0 && versionNumbers[index] > 1 && (
-                  <button
-                    onClick={() => handleDeleteClick(versionNumbers[index])}
-                    style={{
-                      padding: '0.5rem',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      color: 'var(--error)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = 'var(--error-dark)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = 'var(--error)';
-                    }}
-                  >
-                    <span style={{ fontSize: "1.2rem" }}>🗑️</span>
-                  </button>
-                )}
               </div>
-            ))}
-          </div>
+              <div style={{ color: "var(--text-dark)" }}>
+                {historyDescriptions[index] || "No description available"}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -950,106 +918,74 @@ function Dashboard({ onLogout }) {
 
   return (
     <div className="dashboard">
-      <nav className="navbar" style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        padding: '1rem',
-        backgroundColor: 'var(--card-bg)',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-        marginBottom: '2rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <h2 style={{ color: 'var(--primary-color)', margin: 0 }}>Data Monarch</h2>
-          <ThemeToggle />
+      <Sidebar 
+        onFileSelect={handleFileSelect} 
+        onLogout={onLogout}
+        onToggle={handleSidebarToggle}
+      />
+      <div 
+        style={{ 
+          marginLeft: isSidebarCollapsed ? '60px' : '240px',
+          padding: '2rem',
+          transition: 'margin-left 0.3s ease'
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          gap: '1rem',
+          marginBottom: '2rem',
+          overflowX: 'auto',
+          paddingBottom: '0.5rem'
+        }}>
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`btn tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-        <button 
-          onClick={handleLogout}
-          style={{
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: 'var(--primary-dark)',
-            cursor: 'pointer',
-            fontSize: '1.5rem',
-            padding: '0.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'var(--error)';
-            e.currentTarget.style.transform = 'scale(1.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'var(--primary-dark)';
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          <i className="fas fa-sign-out-alt"></i>
-        </button>
-      </nav>
 
-      <div style={{ display: 'flex', gap: '2rem' }}>
-        <Sidebar onFileSelect={handleFileSelect} />
-        <div className="container" style={{ flex: 1 }}>
-          <div style={{
-            display: 'flex',
-            gap: '1rem',
-            marginBottom: '2rem',
-            overflowX: 'auto',
-            paddingBottom: '0.5rem'
-          }}>
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`btn tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div className="card">
+          {renderTabContent()}
+        </div>
 
-          <div className="card">
-            {renderTabContent()}
-          </div>
-
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginTop: '2rem',
-            padding: '0 1rem'
-          }}>
-            <button
-              onClick={handleBack}
-              className="btn"
-              style={{
-                backgroundColor: 'var(--white)',
-                color: 'var(--text-dark)',
-                border: '1px solid var(--border-color)',
-                opacity: currentTabIndex === 0 ? 0.5 : 1,
-                cursor: currentTabIndex === 0 ? 'not-allowed' : 'pointer'
-              }}
-              disabled={currentTabIndex === 0}
-            >
-              ← Back
-            </button>
-            <button
-              onClick={handleNext}
-              className="btn"
-              style={{
-                backgroundColor: 'var(--white)',
-                color: 'var(--text-dark)',
-                border: '1px solid var(--border-color)',
-                opacity: currentTabIndex === tabs.length - 1 ? 0.5 : 1,
-                cursor: currentTabIndex === tabs.length - 1 ? 'not-allowed' : 'pointer'
-              }}
-              disabled={currentTabIndex === tabs.length - 1}
-            >
-              Next →
-            </button>
-          </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: '2rem',
+          padding: '0 1rem'
+        }}>
+          <button
+            onClick={handleBack}
+            className="btn"
+            style={{
+              backgroundColor: 'var(--white)',
+              color: 'var(--text-dark)',
+              border: '1px solid var(--border-color)',
+              opacity: currentTabIndex === 0 ? 0.5 : 1,
+              cursor: currentTabIndex === 0 ? 'not-allowed' : 'pointer'
+            }}
+            disabled={currentTabIndex === 0}
+          >
+            ← Back
+          </button>
+          <button
+            onClick={handleNext}
+            className="btn"
+            style={{
+              backgroundColor: 'var(--white)',
+              color: 'var(--text-dark)',
+              border: '1px solid var(--border-color)',
+              opacity: currentTabIndex === tabs.length - 1 ? 0.5 : 1,
+              cursor: currentTabIndex === tabs.length - 1 ? 'not-allowed' : 'pointer'
+            }}
+            disabled={currentTabIndex === tabs.length - 1}
+          >
+            Next →
+          </button>
         </div>
       </div>
       {renderHistoryPopup()}

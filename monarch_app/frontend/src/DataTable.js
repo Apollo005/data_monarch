@@ -313,100 +313,106 @@ const DataTable = ({ data }) => {
         backgroundColor: 'var(--white)',
         borderRadius: '8px',
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-        border: '1px solid var(--border-color)'
+        border: '1px solid var(--border-color)',
+        position: 'relative'
       }}>
-        <table style={{
+        <div style={{
           width: '100%',
-          borderCollapse: 'collapse',
-          fontSize: '0.875rem'
+          overflowX: 'auto',
+          position: 'relative'
         }}>
-          <thead style={{
-            position: 'sticky',
-            top: 0,
-            backgroundColor: 'var(--white)',
-            zIndex: 1
+          <table style={{
+            width: '100%',
+            minWidth: 'max-content',
+            borderCollapse: 'collapse',
+            fontSize: '0.875rem',
+            tableLayout: 'fixed'
           }}>
-            <tr>
-              {keys.map((key) => (
-                <th 
-                  key={key}
-                  onClick={() => handleSort(key)}
-                  onMouseEnter={(e) => handleColumnHover(e, key)}
-                  onMouseLeave={handleColumnHoverOut}
-                  style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    color: 'var(--text-dark)',
-                    fontWeight: '600',
-                    borderBottom: '2px solid var(--border-color)',
-                    whiteSpace: 'nowrap',
-                    position: 'relative',
-                    transition: 'all 0.2s ease',
-                    cursor: 'pointer',
-                    ':hover': {
-                      backgroundColor: 'var(--primary-color-light)',
-                      color: 'var(--primary-color)'
-                    }
-                  }}
-                >
-                  {key}
-                  {sortConfig.key === key && (
-                    <span style={{ marginLeft: '5px' }}>
-                      {sortConfig.direction === 'asc' ? '↑' : sortConfig.direction === 'desc' ? '↓' : ''}
-                    </span>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedData.map((row, index) => (
-              <tr 
-                key={index}
-                style={{
-                  borderBottom: '1px solid var(--border-color)',
-                  transition: 'all 0.2s ease',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--primary-dark)';
-                  e.currentTarget.style.color = 'var(--white)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--white)';
-                  e.currentTarget.style.color = 'var(--text-dark)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
+            <thead style={{
+              position: 'sticky',
+              top: 0,
+              backgroundColor: 'var(--white)',
+              zIndex: 1
+            }}>
+              <tr>
                 {keys.map((key) => (
-                  <td 
+                  <th 
                     key={key}
+                    onClick={() => handleSort(key)}
                     onMouseEnter={(e) => handleColumnHover(e, key)}
                     onMouseLeave={handleColumnHoverOut}
                     style={{
                       padding: '1rem',
-                      color: sortConfig.key === key 
-                        ? sortConfig.direction === 'asc' 
-                          ? '#e74c3c'  // Red for ascending
-                          : sortConfig.direction === 'desc'
-                            ? '#2ecc71'  // Green for descending
-                            : 'var(--text-dark)'
-                        : 'var(--text-dark)',
+                      textAlign: 'left',
+                      color: 'var(--text-dark)',
+                      fontWeight: '600',
+                      borderBottom: '2px solid var(--border-color)',
                       whiteSpace: 'nowrap',
-                      transition: 'all 0.2s ease',
-                      cursor: showStats ? 'pointer' : 'default'
+                      position: 'relative',
+                      minWidth: '150px',
+                      maxWidth: '300px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      cursor: 'pointer'
                     }}
                   >
-                    {row[key]}
-                  </td>
+                    {key}
+                    {sortConfig.key === key && (
+                      <span style={{ marginLeft: '5px' }}>
+                        {sortConfig.direction === 'asc' ? '↑' : sortConfig.direction === 'desc' ? '↓' : ''}
+                      </span>
+                    )}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sortedData.map((row, index) => (
+                <tr 
+                  key={index}
+                  style={{
+                    borderBottom: '1px solid var(--border-color)',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--primary-dark)';
+                    e.currentTarget.style.color = 'var(--white)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--white)';
+                    e.currentTarget.style.color = 'var(--text-dark)';
+                  }}
+                >
+                  {keys.map((key) => (
+                    <td 
+                      key={key}
+                      onMouseEnter={(e) => handleColumnHover(e, key)}
+                      onMouseLeave={handleColumnHoverOut}
+                      style={{
+                        padding: '1rem',
+                        color: sortConfig.key === key 
+                          ? sortConfig.direction === 'asc' 
+                            ? '#e74c3c'  // Red for ascending
+                            : sortConfig.direction === 'desc'
+                              ? '#2ecc71'  // Green for descending
+                              : 'var(--text-dark)'
+                          : 'var(--text-dark)',
+                        whiteSpace: 'nowrap',
+                        minWidth: '150px',
+                        maxWidth: '300px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        cursor: showStats ? 'pointer' : 'default'
+                      }}
+                    >
+                      {row[key]}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

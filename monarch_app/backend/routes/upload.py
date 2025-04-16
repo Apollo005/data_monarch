@@ -4,7 +4,7 @@ from routes.auth import get_current_user
 from database.files import engine as data_engine, DataSessionLocal
 from database.users import SessionLocal
 from utils.clean_head import clean_header_csv, clean_header_xlsx
-from utils.sanitize import sanitize_table_name, sanitize_dataframe
+from utils.sanitize import sanitize_table_name, sanitize_dataframe, detect_delimiter
 from utils.db_helpers import check_if_table_exists, create_table_from_df
 from utils.text_extract import extract_table_from_txt
 from sqlalchemy.orm import Session
@@ -44,9 +44,12 @@ async def upload_file(
             #check if the file is a csv data file
             if file.filename.endswith('.csv') :
                 content_str = content_bytes.decode("utf-8")
+
+                sample_lines = "\n".join(content_str.splitlines()[:5])  # use first few lines
+                delimiter = detect_delimiter(sample_lines)
                 #if there are extra rows that need to be skipped this will do that
-                skip_rows = clean_header_csv(content_str)
-                df = pd.read_csv(io.StringIO(content_str), skiprows=skip_rows, parse_dates=True)
+                skip_rows = clean_header_csv(content_str, delimiter=delimiter)
+                df = pd.read_csv(io.StringIO(content_str), skiprows=skip_rows, delimiter=delimiter, parse_dates=True)
                 print('csv')
 
             #check if the file is a excel data file

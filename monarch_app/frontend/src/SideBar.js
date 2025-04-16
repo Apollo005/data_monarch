@@ -2,13 +2,17 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import config from "./config";
 
-const Sidebar = ({ onFileSelect }) => {
+const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [fileToDelete, setFileToDelete] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
+  const [username, setUsername] = useState("");
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     const fetchFiles = async () => {
@@ -17,6 +21,17 @@ const Sidebar = ({ onFileSelect }) => {
         if (!token) {
           setError("No token found. Please log in.");
           return;
+        }
+
+        // Fetch username from token
+        const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+        setUsername(tokenPayload.sub);
+
+        // Check for saved theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+          setIsDarkMode(true);
+          document.documentElement.setAttribute('data-theme', 'dark');
         }
 
         const res = await axios.get(`${config.baseUrl}/api/files`, {
@@ -28,7 +43,6 @@ const Sidebar = ({ onFileSelect }) => {
           withCredentials: true,
         });
         setFiles(res.data);
-        console.log(res.data);
       } catch (err) {
         setError("Could not load files. Please try again.");
         console.error(err);
@@ -37,6 +51,17 @@ const Sidebar = ({ onFileSelect }) => {
 
     fetchFiles();
   }, []);
+
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+    if (!isDarkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   const handleFileClick = (file) => {
     setSelectedFile(file);
@@ -92,25 +117,28 @@ const Sidebar = ({ onFileSelect }) => {
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
+    onToggle(!isCollapsed);
   };
 
   return (
     <aside
       style={{
-        // Collapse to a narrower width when isCollapsed = true
-        width: isCollapsed ? "60px" : "280px",
-        // Rounded corners on the entire sidebar
-        borderRadius: "1rem",
+        width: isCollapsed ? "60px" : "240px",
+        borderRadius: "0",
         border: "1px solid var(--border-color)",
         padding: isCollapsed ? "0.5rem" : "1.5rem",
         backgroundColor: "var(--card-bg)",
         boxShadow: "2px 0 5px rgba(0, 0, 0, 0.05)",
         transition: "all 0.3s ease",
-        position: "relative",
+        position: "fixed",
+        left: 0,
+        top: 0,
+        bottom: 0,
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 4rem)", // Subtract navbar height
+        height: "100vh",
+        zIndex: 1000
       }}
     >
       {/* Toggle button at the top-left */}
@@ -232,9 +260,11 @@ const Sidebar = ({ onFileSelect }) => {
         style={{
           flex: 1,
           overflowY: "auto",
-          paddingRight: "0.5rem", // Add some padding for the scrollbar
+          paddingRight: "0.5rem",
           opacity: isCollapsed ? 0 : 1,
           transition: "opacity 0.3s ease",
+          scrollbarWidth: "thin",
+          scrollbarColor: "var(--card-bg) var(--card-bg)",
         }}
       >
         {/* List of files */}
@@ -242,7 +272,7 @@ const Sidebar = ({ onFileSelect }) => {
           <ul
             style={{
               listStyleType: "none",
-              paddingLeft: 0,
+              paddingLeft: 10,
               display: "flex",
               flexDirection: "column",
               gap: "0.75rem",
@@ -364,6 +394,234 @@ const Sidebar = ({ onFileSelect }) => {
           >
             No files found.
           </p>
+        )}
+      </div>
+
+      {/* User Profile Section */}
+      <div
+        style={{
+          marginTop: "auto",
+          padding: "1rem 0",
+          borderTop: "1px solid var(--border-color)",
+          position: "relative",
+          marginBottom: "1rem",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            cursor: "pointer",
+            padding: "0.5rem",
+            borderRadius: "8px",
+            transition: "background-color 0.2s ease",
+          }}
+          onClick={() => setShowProfilePopup(!showProfilePopup)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--hover-bg)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
+        >
+          <div
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "50%",
+              backgroundColor: "var(--primary-color)",
+              color: "var(--white)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: "600",
+              fontSize: "1rem"
+            }}
+          >
+            {username.charAt(0).toUpperCase()}
+          </div>
+          {!isCollapsed && (
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <div
+                style={{
+                  color: "var(--text-dark)",
+                  fontWeight: "500",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis"
+                }}
+              >
+                {username}
+              </div>
+            </div>
+          )}
+          {!isCollapsed && (
+            <i
+              className={`fas fa-chevron-${showProfilePopup ? "up" : "down"}`}
+              style={{
+                color: "var(--text-light)",
+                transition: "transform 0.2s ease"
+              }}
+            />
+          )}
+        </div>
+
+        {/* Profile Popup */}
+        {showProfilePopup && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "100%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              backgroundColor: "var(--white)",
+              borderRadius: "8px",
+              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+              padding: "1.5rem",
+              width: "calc(100% - 2rem)",
+              marginBottom: "1rem",
+              zIndex: 1001
+            }}
+          >
+            <div style={{ marginBottom: "1.5rem" }}>
+              <div
+                style={{
+                  width: "64px",
+                  height: "64px",
+                  borderRadius: "50%",
+                  backgroundColor: "var(--primary-color)",
+                  color: "var(--white)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "600",
+                  fontSize: "1.5rem",
+                  margin: "0 auto 1rem"
+                }}
+              >
+                {username.charAt(0).toUpperCase()}
+              </div>
+              <div
+                style={{
+                  textAlign: "center",
+                  color: "var(--text-dark)",
+                  fontWeight: "600",
+                  fontSize: "1.1rem",
+                  marginBottom: "0.25rem"
+                }}
+              >
+                {username}
+              </div>
+              <div
+                style={{
+                  textAlign: "center",
+                  color: "var(--text-light)",
+                  fontSize: "0.9rem"
+                }}
+              >
+                Member since {new Date().getFullYear()}
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "1rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  transition: "background-color 0.2s ease"
+                }}
+                onClick={toggleTheme}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--hover-bg)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <i
+                    className={`fas fa-${isDarkMode ? "moon" : "sun"}`}
+                    style={{ color: "var(--primary-color)", fontSize: "1.1rem" }}
+                  />
+                  <span style={{ color: "var(--text-dark)" }}>
+                    {isDarkMode ? "Dark Mode" : "Light Mode"}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    width: "40px",
+                    height: "20px",
+                    backgroundColor: isDarkMode ? "var(--primary-color)" : "var(--border-color)",
+                    borderRadius: "10px",
+                    position: "relative",
+                    transition: "background-color 0.2s ease"
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      width: "16px",
+                      height: "16px",
+                      backgroundColor: "var(--white)",
+                      borderRadius: "50%",
+                      top: "2px",
+                      left: isDarkMode ? "22px" : "2px",
+                      transition: "left 0.2s ease"
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  transition: "background-color 0.2s ease"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--hover-bg)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <i className="fas fa-cog" style={{ color: "var(--primary-color)", fontSize: "1.1rem" }} />
+                <span style={{ color: "var(--text-dark)" }}>Settings</span>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  color: "var(--error)",
+                  transition: "background-color 0.2s ease"
+                }}
+                onClick={onLogout}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--error-light)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <i className="fas fa-sign-out-alt" />
+                <span>Logout</span>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 

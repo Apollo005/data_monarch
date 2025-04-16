@@ -1,6 +1,7 @@
 import pandas as pd
 import re
 import os
+import csv
 
 def sanitize_table_name(file_name: str) -> str:
     #remove any non-alphabetic characters, replace spaces with underscores, and ensure it's not too long
@@ -35,3 +36,12 @@ def sanitize_table_name_sql(filename):
     if not name[0].isalpha():
         name = 'tbl_' + name
     return name
+
+
+def detect_delimiter(sample: str, default: str = ",") -> str:
+    sniffer = csv.Sniffer()
+    try:
+        dialect = sniffer.sniff(sample, delimiters=";,|\t")
+        return dialect.delimiter
+    except csv.Error:
+        return default

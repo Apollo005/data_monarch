@@ -1,11 +1,11 @@
 import pandas as pd
 import io
 
-def clean_header_csv(content):
+def clean_header_csv(content, delimiter=","):
     lines = content.split("\n")
     for i, line in enumerate(lines):
-        cols = line.split(",")
-        if len(cols) > 1 and all(len(col.strip()) > 0 for col in cols):
+        cols = [col.strip() for col in line.split(delimiter) if col.strip()]
+        if len(cols) >= 2:
             return i
     return 0
 
