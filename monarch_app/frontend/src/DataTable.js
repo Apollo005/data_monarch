@@ -1,25 +1,92 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-const DataTable = ({ data }) => {
+const DataTable = ({ data, fileId, onPageChange }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [searchQuery, setSearchQuery] = useState("");
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState(null);
   const [statsPosition, setStatsPosition] = useState({ x: 0, y: 0 });
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(500);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRows, setTotalRows] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [paginatedData, setPaginatedData] = useState(null);
+  
   // Add more robust null checks
   const keys = data && Array.isArray(data) && data.length > 0 ? Object.keys(data[0]) : [];
-  const totalRows = data && Array.isArray(data) ? data.length : 0;
+  const totalRowsFromData = data && Array.isArray(data) ? data.length : 0;
 
-  // Calculate statistics for a column
-  const calculateStats = (column) => {
-    if (!data || !Array.isArray(data) || data.length === 0) return null;
+  // Fetch paginated data when fileId, currentPage, or pageSize changes
+  useEffect(() => {
+    if (fileId) {
+      fetchPaginatedData();
+    } else if (data) {
+      // If no fileId is provided, use the data prop directly with client-side pagination
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedData = data.slice(startIndex, endIndex);
+      setPaginatedData(paginatedData);
+      setTotalRows(data.length);
+      setTotalPages(Math.ceil(data.length / pageSize));
+    }
+  }, [fileId, currentPage, pageSize, data]);
+
+  const fetchPaginatedData = async () => {
+    if (!fileId) return;
     
-    const values = data.map(row => row[column]);
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/data/${fileId}/paginated?page=${currentPage}&page_size=${pageSize}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch paginated data');
+      }
+      
+      const result = await response.json();
+      setPaginatedData(result.data);
+      setTotalRows(result.pagination.total_records);
+      setTotalPages(result.pagination.total_pages);
+      
+      // Notify parent component about page change if callback provided
+      if (onPageChange) {
+        onPageChange(currentPage, result.pagination.total_pages);
+      }
+    } catch (error) {
+      console.error('Error fetching paginated data:', error);
+      // Fallback to using the data prop if pagination fails
+      if (data) {
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedData = data.slice(startIndex, endIndex);
+        setPaginatedData(paginatedData);
+        setTotalRows(data.length);
+        setTotalPages(Math.ceil(data.length / pageSize));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Calculate statistics for a column using only visible/paginated data
+  const calculateStats = (column) => {
+    if (!paginatedData || !Array.isArray(paginatedData) || paginatedData.length === 0) return null;
+    
+    const values = paginatedData.map(row => row[column]);
     const numericValues = values.map(v => parseFloat(v)).filter(v => !isNaN(v));
     
     if (numericValues.length === 0) {
-      // For non-numeric columns, calculate mode only
+      // For non-numeric columns, calculate mode only from current page
       const frequency = {};
       values.forEach(v => {
         frequency[v] = (frequency[v] || 0) + 1;
@@ -32,7 +99,8 @@ const DataTable = ({ data }) => {
         average: 'N/A',
         range: 'N/A',
         mode: mode,
-        median: 'N/A'
+        median: 'N/A',
+        note: '* Statistics shown are for current page only'
       };
     }
 
@@ -57,16 +125,17 @@ const DataTable = ({ data }) => {
       max: max.toFixed(2),
       average: average.toFixed(2),
       range: (max - min).toFixed(2),
-      mode: typeof mode[0] === 'number' ? mode[0].toFixed(2) : mode[0],
-      median: median.toFixed(2)
+      mode: typeof mode === 'number' ? mode.toFixed(2) : mode,
+      median: median.toFixed(2),
+      note: '* Statistics shown are for current page only'
     };
   };
 
-  // Handle column hover for statistics
-  const handleColumnHover = (e, column) => {
+  // Debounce the column hover handler
+  const handleColumnHover = React.useCallback((e, column) => {
     if (!showStats) return;
     setStats(calculateStats(column));
-  };
+  }, [showStats, paginatedData]);
 
   // Handle column hover out
   const handleColumnHoverOut = () => {
@@ -75,7 +144,7 @@ const DataTable = ({ data }) => {
   };
 
   // Filter data based on search query
-  const filteredData = data && Array.isArray(data) ? data.filter(row => {
+  const filteredData = paginatedData && Array.isArray(paginatedData) ? paginatedData.filter(row => {
     if (!searchQuery) return true;
     return Object.values(row).some(value => 
       String(value).toLowerCase().includes(searchQuery.toLowerCase())
@@ -83,7 +152,7 @@ const DataTable = ({ data }) => {
   }) : [];
 
   // Early return with a more informative message
-  if (!data || !Array.isArray(data) || data.length === 0) {
+  if ((!data && !paginatedData) || (!Array.isArray(data) && !Array.isArray(paginatedData)) || (data && Array.isArray(data) && data.length === 0 && (!paginatedData || !Array.isArray(paginatedData) || paginatedData.length === 0))) {
     return (
       <div style={{
         width: '100%',
@@ -169,6 +238,69 @@ const DataTable = ({ data }) => {
   };
 
   const sortedData = getSortedData();
+
+  // Pagination handlers
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const handlePageSizeChange = (e) => {
+    const newPageSize = parseInt(e.target.value);
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pageNumbers = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      // Show all pages if total is less than max visible
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i);
+      }
+    } else {
+      // Always show first page
+      pageNumbers.push(1);
+      
+      // Calculate start and end of visible pages
+      let startPage = Math.max(2, currentPage - 1);
+      let endPage = Math.min(totalPages - 1, currentPage + 1);
+      
+      // Adjust if we're near the beginning
+      if (currentPage <= 2) {
+        endPage = 4;
+      }
+      
+      // Adjust if we're near the end
+      if (currentPage >= totalPages - 1) {
+        startPage = totalPages - 3;
+      }
+      
+      // Add ellipsis if needed
+      if (startPage > 2) {
+        pageNumbers.push('...');
+      }
+      
+      // Add middle pages
+      for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i);
+      }
+      
+      // Add ellipsis if needed
+      if (endPage < totalPages - 1) {
+        pageNumbers.push('...');
+      }
+      
+      // Always show last page
+      pageNumbers.push(totalPages);
+    }
+    
+    return pageNumbers;
+  };
 
   return (
     <div style={{
@@ -303,6 +435,17 @@ const DataTable = ({ data }) => {
             <div style={{ color: 'var(--text-dark)', textAlign: 'center' }}>{stats.mode}</div>
             <div style={{ color: 'var(--text-dark)', textAlign: 'center' }}>{stats.median}</div>
           </div>
+          {stats.note && (
+            <div style={{
+              marginTop: '1rem',
+              fontSize: '0.75rem',
+              color: 'var(--text-light)',
+              textAlign: 'center',
+              fontStyle: 'italic'
+            }}>
+              {stats.note}
+            </div>
+          )}
         </div>
       )}
 
@@ -312,10 +455,26 @@ const DataTable = ({ data }) => {
         overflow: 'auto',
         backgroundColor: 'var(--white)',
         borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
         border: '1px solid var(--border-color)',
         position: 'relative'
       }}>
+        {isLoading && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10
+          }}>
+            <div className="loading-spinner"></div>
+          </div>
+        )}
         <div style={{
           width: '100%',
           overflowX: 'auto',
@@ -414,6 +573,156 @@ const DataTable = ({ data }) => {
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: '1rem',
+          padding: '0.5rem 0',
+          borderTop: '1px solid var(--border-color)'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span style={{ color: 'var(--text-dark)', fontSize: '0.875rem' }}>Rows per page:</span>
+            <select
+              value={pageSize}
+              onChange={handlePageSizeChange}
+              style={{
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--white)',
+                color: 'var(--text-dark)',
+                fontSize: '0.875rem'
+              }}
+            >
+              <option value={100}>100</option>
+              <option value={250}>250</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
+            </select>
+          </div>
+          
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <button
+              onClick={() => handlePageChange(1)}
+              disabled={currentPage === 1}
+              style={{
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: currentPage === 1 ? 'var(--background-light)' : 'var(--white)',
+                color: currentPage === 1 ? 'var(--text-light)' : 'var(--text-dark)',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              <i className="fas fa-angle-double-left"></i>
+            </button>
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              style={{
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: currentPage === 1 ? 'var(--background-light)' : 'var(--white)',
+                color: currentPage === 1 ? 'var(--text-light)' : 'var(--text-dark)',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              <i className="fas fa-angle-left"></i>
+            </button>
+            
+            <div style={{
+              display: 'flex',
+              gap: '0.25rem'
+            }}>
+              {getPageNumbers().map((pageNum, index) => (
+                pageNum === '...' ? (
+                  <span 
+                    key={`ellipsis-${index}`}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      color: 'var(--text-dark)',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={`page-${pageNum}`}
+                    onClick={() => handlePageChange(pageNum)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: currentPage === pageNum ? 'var(--primary-color)' : 'var(--white)',
+                      color: currentPage === pageNum ? 'var(--white)' : 'var(--text-dark)',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      minWidth: '2rem',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                )
+              ))}
+            </div>
+            
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: currentPage === totalPages ? 'var(--background-light)' : 'var(--white)',
+                color: currentPage === totalPages ? 'var(--text-light)' : 'var(--text-dark)',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              <i className="fas fa-angle-right"></i>
+            </button>
+            <button
+              onClick={() => handlePageChange(totalPages)}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: currentPage === totalPages ? 'var(--background-light)' : 'var(--white)',
+                color: currentPage === totalPages ? 'var(--text-light)' : 'var(--text-dark)',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              <i className="fas fa-angle-double-right"></i>
+            </button>
+          </div>
+          
+          <div style={{
+            color: 'var(--text-dark)',
+            fontSize: '0.875rem'
+          }}>
+            {`${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalRows)} of ${totalRows}`}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

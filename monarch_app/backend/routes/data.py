@@ -64,3 +64,60 @@ async def get_file_data(file_id: int, db: Session = Depends(get_db), current_use
     except Exception as e:
         logger.error(f"Error in get_file_data: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
+
+
+
+@router.get("/api/data/{file_id}/paginated")
+async def get_paginated_file_data(
+    file_id: int, 
+    page: int = 1,
+    page_size: int = 500,
+    db: Session = Depends(get_db), 
+    current_user=Depends(get_current_user)
+):
+    try:
+        # Check ownership
+        file_record = db.query(File).filter(
+            File.id == file_id, 
+            File.user_id == current_user.id
+        ).first()
+        if not file_record:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        table_name = file_record.file_path
+        logger.info(f"Fetching paginated data from table: {table_name}")
+        
+        with engine.connect() as connection:
+            # First get total count
+            count_query = text(f"SELECT COUNT(*) FROM {table_name}")
+            total_count = connection.execute(count_query).scalar()
+            
+            # Calculate total pages
+            total_pages = (total_count + page_size - 1) // page_size
+            
+            # Get paginated data
+            offset = (page - 1) * page_size
+            query = text(f"SELECT * FROM {table_name} LIMIT {page_size} OFFSET {offset}")
+            result = connection.execute(query)
+            
+            # Convert result to DataFrame
+            df = pd.DataFrame(result.fetchall(), columns=result.keys())
+            
+            # Convert to list-of-dicts
+            records = df.to_dict("records")
+            
+            return {
+                "data": records,
+                "pagination": {
+                    "current_page": page,
+                    "total_pages": total_pages,
+                    "total_records": total_count,
+                    "page_size": page_size
+                }
+            }
+            
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error in get_paginated_file_data: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error fetching paginated data: {str(e)}")

@@ -415,79 +415,13 @@ function Dashboard({ onLogout }) {
         </div>
 
         {/* Data table */}
-        <table className="table" style={{ width: '100%', tableLayout: 'fixed' }}>
-          <thead>
-            <tr>
-              {columns.map(column => (
-                visibleColumns[column] && (
-                  <th 
-                    key={column}
-                    onClick={() => handleColumnSort(column)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--primary-dark)";
-                      e.currentTarget.style.color = "var(--white)";
-                    }}
-                    onMouseLeave={(e) => {
-                      // Preserve highlighted background if this column is currently sorted
-                      if (sortConfig.column === column) {
-                        e.currentTarget.style.backgroundColor = "var(--primary-color)";
-                        e.currentTarget.style.color = "var(--text-dark)";
-                      } else {
-                        e.currentTarget.style.backgroundColor = "var(--white)";
-                        e.currentTarget.style.color = "var(--text-dark)";
-                      }
-                    }}
-                    style={{
-                      width: `${100 / Object.values(visibleColumns).filter(Boolean).length}%`,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      padding: '0.75rem',
-                      backgroundColor: sortConfig.column === column ? 'var(--primary-color-light)' : 'var(--white)',
-                      transition: 'background-color 0.2s ease'
-                    }}
-                  >
-                    {column}
-                    {sortConfig.column === column && (
-                      <span style={{
-                        position: 'absolute',
-                        right: '0.5rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: 'var(--primary-color)'
-                      }}>
-                        {sortConfig.direction === 'desc' ? '↓' : sortConfig.direction === 'asc' ? '↑' : ''}
-                      </span>
-                    )}
-                  </th>
-                )
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {uploadedData.map((row, index) => (
-              <tr key={index}>
-                {columns.map(column => (
-                  visibleColumns[column] && (
-                    <td 
-                      key={column}
-                      style={{
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        padding: '0.75rem'
-                      }}
-                    >
-                      {row[column]}
-                    </td>
-                  )
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable 
+          data={uploadedData} 
+          fileId={selectedFile ? selectedFile.id : null}
+          onPageChange={(page, totalPages) => {
+            console.log(`Page ${page} of ${totalPages}`);
+          }}
+        />
       </div>
     );
   };
@@ -676,7 +610,7 @@ function Dashboard({ onLogout }) {
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          backgroundColor: "var(--white)",
+          backgroundColor: "var(--card-bg)",
           padding: "2rem",
           borderRadius: "8px",
           boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
@@ -910,7 +844,10 @@ function Dashboard({ onLogout }) {
               ×
             </button>
           </div>
-          <DataTable data={dataHistory[currentHistoryIndex]} />
+          <DataTable 
+            data={dataHistory[currentHistoryIndex]} 
+            fileId={selectedFile ? selectedFile.id : null}
+          />
         </div>
       </div>
     );
@@ -926,66 +863,130 @@ function Dashboard({ onLogout }) {
       <div 
         style={{ 
           marginLeft: isSidebarCollapsed ? '60px' : '240px',
-          padding: '2rem',
-          transition: 'margin-left 0.3s ease'
+          padding: '0',
+          transition: 'margin-left 0.3s ease',
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
+        {/* New Header Section */}
         <div style={{
+          backgroundColor: 'var(--card-bg)',
+          borderBottom: '1px solid var(--border-color)',
+          padding: '0.5rem 1rem',
           display: 'flex',
-          gap: '1rem',
-          marginBottom: '2rem',
-          overflowX: 'auto',
-          paddingBottom: '0.5rem'
-        }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`btn tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="card">
-          {renderTabContent()}
-        </div>
-
-        <div style={{
-          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          marginTop: '2rem',
-          padding: '0 1rem'
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
         }}>
-          <button
-            onClick={handleBack}
-            className="btn"
-            style={{
-              backgroundColor: 'var(--white)',
-              color: 'var(--text-dark)',
-              border: '1px solid var(--border-color)',
-              opacity: currentTabIndex === 0 ? 0.5 : 1,
-              cursor: currentTabIndex === 0 ? 'not-allowed' : 'pointer'
-            }}
-            disabled={currentTabIndex === 0}
-          >
-            ← Back
-          </button>
-          <button
-            onClick={handleNext}
-            className="btn"
-            style={{
-              backgroundColor: 'var(--white)',
-              color: 'var(--text-dark)',
-              border: '1px solid var(--border-color)',
-              opacity: currentTabIndex === tabs.length - 1 ? 0.5 : 1,
-              cursor: currentTabIndex === tabs.length - 1 ? 'not-allowed' : 'pointer'
-            }}
-            disabled={currentTabIndex === tabs.length - 1}
-          >
-            Next →
-          </button>
+          {/* Left side - Dropdowns */}
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            {/* Dashboard Dropdown */}
+            <div className="dropdown" style={{ position: 'relative' }}>
+              <button style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: 'var(--text-dark)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.9rem'
+              }}>
+                Dashboard <i className="fas fa-chevron-down"></i>
+              </button>
+            </div>
+
+            {/* Actions Dropdown */}
+            <div className="dropdown" style={{ position: 'relative' }}>
+              <button style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: 'var(--text-dark)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.9rem'
+              }}>
+                Actions <i className="fas fa-chevron-down"></i>
+              </button>
+            </div>
+
+            {/* Quick Actions */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '0.5rem', 
+              borderLeft: '1px solid var(--border-color)',
+              paddingLeft: '1rem'
+            }}>
+              <button className="icon-button" title="Add">
+                <i className="fas fa-plus"></i>
+              </button>
+              <button className="icon-button" title="Delete">
+                <i className="fas fa-trash"></i>
+              </button>
+              <button className="icon-button" title="Copy">
+                <i className="fas fa-copy"></i>
+              </button>
+              <button className="icon-button" title="Summarize">
+                <i className="fas fa-list"></i>
+              </button>
+            </div>
+          </div>
+
+          {/* Right side - Tabs */}
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem',
+            alignItems: 'center'
+          }}>
+            <button
+              onClick={() => setActiveTab('upload')}
+              className={`header-tab ${activeTab === 'upload' ? 'active' : ''}`}
+            >
+              Upload Data
+            </button>
+            <button
+              onClick={() => setActiveTab('filter')}
+              className={`header-tab ${activeTab === 'filter' ? 'active' : ''}`}
+            >
+              Filter Data
+            </button>
+            <button
+              onClick={() => setActiveTab('analyze')}
+              className={`header-tab ${activeTab === 'analyze' ? 'active' : ''}`}
+            >
+              Analyze Data
+            </button>
+            <button
+              onClick={() => setActiveTab('visualize')}
+              className={`header-tab ${activeTab === 'visualize' ? 'active' : ''}`}
+            >
+              Visualize
+            </button>
+            <button
+              onClick={() => setActiveTab('export')}
+              className={`header-tab ${activeTab === 'export' ? 'active' : ''}`}
+            >
+              Export Data
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content Area */}
+        <div style={{ 
+          flex: 1, 
+          padding: '1.5rem', 
+          backgroundColor: 'var(--background-light)',
+          overflowY: 'auto' 
+        }}>
+          <div className="card" style={{ height: '100%' }}>
+            {renderTabContent()}
+          </div>
         </div>
       </div>
       {renderHistoryPopup()}

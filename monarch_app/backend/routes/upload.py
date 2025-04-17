@@ -51,6 +51,8 @@ async def upload_file(
                 skip_rows = clean_header_csv(content_str, delimiter=delimiter)
                 df = pd.read_csv(io.StringIO(content_str), skiprows=skip_rows, delimiter=delimiter, parse_dates=True)
                 print('csv')
+                df.columns = [col.strip() for col in df.columns]  # Strip extra spaces
+                df.columns = [re.sub(r'[^\w\s]', '', col) for col in df.columns]  # Remove any non-alphanumeric symbols
 
             #check if the file is a excel data file
             elif file.filename.endswith('.xlsx') :

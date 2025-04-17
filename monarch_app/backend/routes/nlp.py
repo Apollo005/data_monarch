@@ -572,18 +572,19 @@ async def filter_data(
             )
             columns = [row[0] for row in result]
             logger.info(f"Found columns in table {source_table}: {columns}")
-            
+
             # Validate all column names
             for column in columns:
                 if not validate_column_name(column):
+                    logger.info("validate_col")
                     raise HTTPException(status_code=400, detail=f"Invalid column name: {column}")
             
             # Create a dummy DataFrame with the actual column names
             df = pd.DataFrame(columns=columns)
-            
+
             # Process the natural language query
             operation_dict = process_natural_language_query(request.query, df)
-            
+
             # Sanitize and validate the query
             try:
                 sanitized_query = sanitize_query(operation_dict["query"])

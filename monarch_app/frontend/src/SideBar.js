@@ -13,6 +13,9 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [username, setUsername] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showFileMenu, setShowFileMenu] = useState(null);
+  const [isRenaming, setIsRenaming] = useState(null);
+  const [newFileName, setNewFileName] = useState("");
 
   useEffect(() => {
     const fetchFiles = async () => {
@@ -120,13 +123,95 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
     onToggle(!isCollapsed);
   };
 
+  const handleRenameClick = (file, event) => {
+    event.stopPropagation();
+    setIsRenaming(file.id);
+    setNewFileName(file.filename);
+    setShowFileMenu(null);
+  };
+
+  const handleRenameSubmit = async (file, event) => {
+    event.preventDefault();
+    if (!newFileName.trim() || newFileName === file.filename) {
+      setIsRenaming(null);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      await axios.patch(`${config.baseUrl}/api/files/${file.id}`, 
+        { filename: newFileName },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          withCredentials: true,
+        }
+      );
+
+      // Update file in local state
+      setFiles(files.map(f => 
+        f.id === file.id ? { ...f, filename: newFileName } : f
+      ));
+      setIsRenaming(null);
+    } catch (err) {
+      setError("Failed to rename file. Please try again.");
+      console.error(err);
+    }
+  };
+
+  const handleFileMenuClick = (fileId, event) => {
+    event.stopPropagation();
+    setShowFileMenu(showFileMenu === fileId ? null : fileId);
+  };
+
+  // Close file menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showFileMenu && !event.target.closest('.file-menu') && !event.target.closest('.file-menu-trigger')) {
+        setShowFileMenu(null);
+      }
+      
+      if (showUserMenu && !event.target.closest('.user-menu') && !event.target.closest('.user-profile-trigger')) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showFileMenu, showUserMenu]);
+
+  const toggleUserMenu = (event) => {
+    event.stopPropagation();
+    setShowUserMenu(!showUserMenu);
+  };
+
+  const handleLogout = () => {
+    setShowUserMenu(false);
+    onLogout();
+  };
+
+  const handleSettings = () => {
+    setShowUserMenu(false);
+    // Placeholder for settings functionality
+    console.log("Settings clicked");
+  };
+
+  const handleProfile = () => {
+    setShowUserMenu(false);
+    // Placeholder for profile functionality
+    console.log("Profile clicked");
+  };
+
   return (
     <aside
       style={{
         width: isCollapsed ? "60px" : "240px",
         borderRadius: "0",
-        border: "1px solid var(--border-color)",
-        padding: isCollapsed ? "0.5rem" : "1.5rem",
+        borderRight: "1px solid var(--border-color)",
+        padding: isCollapsed ? "0.5rem" : "1rem",
         backgroundColor: "var(--card-bg)",
         boxShadow: "2px 0 5px rgba(0, 0, 0, 0.05)",
         transition: "all 0.3s ease",
@@ -141,556 +226,372 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
         zIndex: 1000
       }}
     >
-      {/* Toggle button at the top-left */}
+      {/* Toggle button */}
       <button
         onClick={toggleSidebar}
         style={{
           position: "absolute",
           top: "1rem",
           left: "1rem",
-          width: "36px",
-          height: "36px",
-          borderRadius: "50%",
-          backgroundColor: "var(--primary-color)",
-          border: "none",
-          color: "var(--white)",
+          width: "32px",
+          height: "32px",
+          borderRadius: "6px",
+          backgroundColor: "transparent",
+          border: "1px solid var(--border-color)",
+          color: "var(--text-dark)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           cursor: "pointer",
           zIndex: 10,
-          fontSize: "1.2rem",
-          boxShadow: "0 0 8px var(--primary-light)",
-          transition: "transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease"
+          fontSize: "1rem",
+          transition: "all 0.2s ease"
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "rotate(90deg) scale(1.1)";
-          e.currentTarget.style.backgroundColor = "var(--primary-dark)";
-          e.currentTarget.style.boxShadow = "0 0 12px var(--primary-color)";
+          e.currentTarget.style.backgroundColor = "var(--background-light)";
+          e.currentTarget.style.color = "var(--primary-color)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "rotate(0deg) scale(1)";
-          e.currentTarget.style.backgroundColor = "var(--primary-color)";
-          e.currentTarget.style.boxShadow = "0 0 8px var(--primary-light)";
+          e.currentTarget.style.backgroundColor = "transparent";
+          e.currentTarget.style.color = "var(--text-dark)";
         }}
       >
-        {isCollapsed ? "≡" : "≡"}
+        <i className={`fas fa-${isCollapsed ? 'chevron-right' : 'chevron-left'}`}></i>
       </button>
 
-      {/* Title & "New Upload" button */}
-      <div
-        style={{
-          // Push content down so it doesn't overlap the toggle button
-          marginTop: "3rem",
-          opacity: isCollapsed ? 0 : 1,
-          transition: "opacity 0.3s ease",
-          flexShrink: 0, // Prevent header from shrinking
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1.5rem",
-          }}
-        >
-          <h2
-            style={{
-              color: "var(--text-dark)",
-              fontSize: "1.1rem",
-              fontWeight: "600",
-              margin: 0,
-              whiteSpace: "nowrap",
-              textAlign: "center",
-            }}
-          >
-            My Uploaded Files
+      {/* Header section */}
+      <div style={{
+        marginTop: "4rem",
+        opacity: isCollapsed ? 0 : 1,
+        transition: "opacity 0.3s ease",
+        flexShrink: 0,
+        paddingBottom: "1rem",
+        borderBottom: "1px solid var(--border-color)"
+      }}>
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "1rem",
+          padding: "0 0.5rem"
+        }}>
+          <h2 style={{
+            color: "var(--text-dark)",
+            fontSize: "0.9rem",
+            fontWeight: "600",
+            margin: 0,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em"
+          }}>
+            Files
           </h2>
           <button
             onClick={handleNewUpload}
             style={{
-                position: "absolute",
-                top: "1rem",
-                right: "1rem",
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                backgroundColor: "var(--primary-color)",
-                border: "none",
-                color: "var(--white)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                zIndex: 10,
-                fontSize: "1.2rem",
-                boxShadow: "0 0 8px var(--primary-light)",
-                transition: "transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease",
-            }}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "rotate(90deg) scale(1.1)";
-                e.currentTarget.style.backgroundColor = "var(--primary-dark)";
-                e.currentTarget.style.boxShadow = "0 0 12px var(--primary-color)";
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "rotate(0deg) scale(1)";
-                e.currentTarget.style.backgroundColor = "var(--primary-color)";
-                e.currentTarget.style.boxShadow = "0 0 8px var(--primary-light)";
-            }}
-          >
-            <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>+</span>
-          </button>
-        </div>
-
-        {error && (
-          <p
-            style={{
-              color: "var(--error)",
-              marginBottom: "1rem",
-            }}
-          >
-            {error}
-          </p>
-        )}
-      </div>
-
-      {/* Scrollable content area */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          paddingRight: "0.5rem",
-          opacity: isCollapsed ? 0 : 1,
-          transition: "opacity 0.3s ease",
-          scrollbarWidth: "thin",
-          scrollbarColor: "var(--card-bg) var(--card-bg)",
-        }}
-      >
-        {/* List of files */}
-        {files.length > 0 ? (
-          <ul
-            style={{
-              listStyleType: "none",
-              paddingLeft: 10,
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.75rem",
-            }}
-          >
-            {files.map((file) => (
-              <li
-                key={file.id}
-                style={{
-                  cursor: "pointer",
-                  padding: "1rem",
-                  backgroundColor:
-                    selectedFile?.id === file.id
-                      ? "var(--primary-color-light)"
-                      : "var(--white)",
-                  borderRadius: "8px",
-                  border:
-                    selectedFile?.id === file.id
-                      ? "2px solid var(--primary-color)"
-                      : "1px solid var(--border-color)",
-                  transition: "all 0.2s ease",
-                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
-                  position: "relative",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                }}
-                onClick={() => handleFileClick(file)}
-                onMouseEnter={(e) => {
-                  if (selectedFile?.id !== file.id) {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 4px 8px rgba(0, 0, 0, 0.1)";
-                    e.currentTarget.style.borderColor = "var(--primary-color)";
-                    e.currentTarget.style.backgroundColor =
-                      "var(--primary-color-light)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedFile?.id !== file.id) {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "0 2px 4px rgba(0, 0, 0, 0.05)";
-                    e.currentTarget.style.borderColor = "var(--border-color)";
-                    e.currentTarget.style.backgroundColor = "var(--white)";
-                  }
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  <span
-                    style={{
-                      color: "var(--primary-color)",
-                      fontSize: "1.2rem",
-                    }}
-                  >
-                    📄
-                  </span>
-                  <strong
-                    style={{
-                      color: "var(--text-dark)",
-                      fontSize: "1rem",
-                      flex: 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {file.filename}
-                  </strong>
-                  <button
-                    onClick={(e) => handleDeleteClick(file, e)}
-                    style={{
-                      backgroundColor: "transparent",
-                      border: "none",
-                      color: "var(--error)",
-                      cursor: "pointer",
-                      padding: "4px",
-                      borderRadius: "4px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "all 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--error-light)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    <span style={{ fontSize: "1.2rem" }}>🗑️</span>
-                  </button>
-                </div>
-                <small
-                  style={{
-                    color: "var(--text-light)",
-                    display: "block",
-                  }}
-                >
-                  Uploaded: {new Date(file.created_at).toLocaleString()}
-                </small>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p
-            style={{
-              color: "var(--text-light)",
-              textAlign: "center",
-              padding: "2rem",
-              backgroundColor: "var(--background-light)",
-              borderRadius: "8px",
-            }}
-          >
-            No files found.
-          </p>
-        )}
-      </div>
-
-      {/* User Profile Section */}
-      <div
-        style={{
-          marginTop: "auto",
-          padding: "1rem 0",
-          borderTop: "1px solid var(--border-color)",
-          position: "relative",
-          marginBottom: "1rem",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-            cursor: "pointer",
-            padding: "0.5rem",
-            borderRadius: "8px",
-            transition: "background-color 0.2s ease",
-          }}
-          onClick={() => setShowProfilePopup(!showProfilePopup)}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "var(--hover-bg)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "transparent";
-          }}
-        >
-          <div
-            style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "50%",
+              width: "28px",
+              height: "28px",
+              borderRadius: "6px",
               backgroundColor: "var(--primary-color)",
+              border: "none",
               color: "var(--white)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontWeight: "600",
-              fontSize: "1rem"
+              cursor: "pointer",
+              fontSize: "1rem",
+              transition: "all 0.2s ease"
             }}
+            title="New Upload"
           >
-            {username.charAt(0).toUpperCase()}
-          </div>
-          {!isCollapsed && (
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              <div
-                style={{
-                  color: "var(--text-dark)",
-                  fontWeight: "500",
+            <i className="fas fa-plus"></i>
+          </button>
+        </div>
+      </div>
+
+      {/* Files list */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        marginTop: "1rem",
+        opacity: isCollapsed ? 0 : 1,
+        transition: "opacity 0.3s ease"
+      }}>
+        {error && (
+          <p style={{
+            color: "var(--error)",
+            fontSize: "0.875rem",
+            padding: "0.5rem",
+            margin: "0 0.5rem",
+            backgroundColor: "var(--error-light)",
+            borderRadius: "4px"
+          }}>
+            {error}
+          </p>
+        )}
+
+        {files.map((file) => (
+          <div
+            key={file.id}
+            onClick={() => handleFileClick(file)}
+            className={`file-item ${selectedFile?.id === file.id ? 'selected' : ''}`}
+          >
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              overflow: "hidden",
+              flex: 1
+            }}>
+              <i className={`fas fa-${getFileIcon(file.file_type)}`} style={{ 
+                fontSize: "0.875rem",
+                color: selectedFile?.id === file.id ? "var(--primary-color)" : "var(--text-light)"
+              }}></i>
+              {isRenaming === file.id ? (
+                <form onSubmit={(e) => handleRenameSubmit(file, e)} style={{ flex: 1 }}>
+                  <input
+                    type="text"
+                    value={newFileName}
+                    onChange={(e) => setNewFileName(e.target.value)}
+                    onBlur={(e) => handleRenameSubmit(file, e)}
+                    autoFocus
+                    style={{
+                      width: "100%",
+                      padding: "0.25rem 0.5rem",
+                      border: "1px solid var(--primary-color)",
+                      borderRadius: "4px",
+                      fontSize: "0.875rem"
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </form>
+              ) : (
+                <span style={{
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis"
-                }}
-              >
-                {username}
-              </div>
+                }}>
+                  {file.filename}
+                </span>
+              )}
             </div>
-          )}
-          {!isCollapsed && (
-            <i
-              className={`fas fa-chevron-${showProfilePopup ? "up" : "down"}`}
-              style={{
-                color: "var(--text-light)",
-                transition: "transform 0.2s ease"
-              }}
-            />
-          )}
-        </div>
-
-        {/* Profile Popup */}
-        {showProfilePopup && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "100%",
-              left: "50%",
-              transform: "translateX(-50%)",
-              backgroundColor: "var(--white)",
-              borderRadius: "8px",
-              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-              padding: "1.5rem",
-              width: "calc(100% - 2rem)",
-              marginBottom: "1rem",
-              zIndex: 1001
-            }}
-          >
-            <div style={{ marginBottom: "1.5rem" }}>
-              <div
+            
+            <div className="file-actions">
+              <button
+                className="file-menu-trigger"
+                onClick={(e) => handleFileMenuClick(file.id, e)}
                 style={{
-                  width: "64px",
-                  height: "64px",
-                  borderRadius: "50%",
-                  backgroundColor: "var(--primary-color)",
-                  color: "var(--white)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: "600",
-                  fontSize: "1.5rem",
-                  margin: "0 auto 1rem"
-                }}
-              >
-                {username.charAt(0).toUpperCase()}
-              </div>
-              <div
-                style={{
-                  textAlign: "center",
-                  color: "var(--text-dark)",
-                  fontWeight: "600",
-                  fontSize: "1.1rem",
-                  marginBottom: "0.25rem"
-                }}
-              >
-                {username}
-              </div>
-              <div
-                style={{
-                  textAlign: "center",
+                  backgroundColor: "transparent",
+                  border: "none",
                   color: "var(--text-light)",
-                  fontSize: "0.9rem"
-                }}
-              >
-                Member since {new Date().getFullYear()}
-              </div>
-            </div>
-
-            <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "1rem" }}>
-              <div
-                style={{
+                  cursor: "pointer",
+                  padding: "0.25rem",
+                  borderRadius: "4px",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "0.75rem",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  transition: "background-color 0.2s ease"
-                }}
-                onClick={toggleTheme}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--hover-bg)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
+                  transition: "all 0.2s ease"
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <i
-                    className={`fas fa-${isDarkMode ? "moon" : "sun"}`}
-                    style={{ color: "var(--primary-color)", fontSize: "1.1rem" }}
-                  />
-                  <span style={{ color: "var(--text-dark)" }}>
-                    {isDarkMode ? "Dark Mode" : "Light Mode"}
-                  </span>
+                <i className="fas fa-ellipsis-h"></i>
+              </button>
+
+              {showFileMenu === file.id && (
+                <div className="file-menu">
+                  <button
+                    className="file-menu-item"
+                    onClick={(e) => handleRenameClick(file, e)}
+                  >
+                    <i className="fas fa-edit"></i>
+                    Rename
+                  </button>
+                  <button
+                    className="file-menu-item delete"
+                    onClick={(e) => handleDeleteClick(file, e)}
+                  >
+                    <i className="fas fa-trash-alt"></i>
+                    Delete
+                  </button>
                 </div>
-                <div
-                  style={{
-                    width: "40px",
-                    height: "20px",
-                    backgroundColor: isDarkMode ? "var(--primary-color)" : "var(--border-color)",
-                    borderRadius: "10px",
-                    position: "relative",
-                    transition: "background-color 0.2s ease"
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      width: "16px",
-                      height: "16px",
-                      backgroundColor: "var(--white)",
-                      borderRadius: "50%",
-                      top: "2px",
-                      left: isDarkMode ? "22px" : "2px",
-                      transition: "left 0.2s ease"
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  padding: "0.75rem",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  transition: "background-color 0.2s ease"
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--hover-bg)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                <i className="fas fa-cog" style={{ color: "var(--primary-color)", fontSize: "1.1rem" }} />
-                <span style={{ color: "var(--text-dark)" }}>Settings</span>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  padding: "0.75rem",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  color: "var(--error)",
-                  transition: "background-color 0.2s ease"
-                }}
-                onClick={onLogout}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--error-light)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                <i className="fas fa-sign-out-alt" />
-                <span>Logout</span>
-              </div>
+              )}
             </div>
+          </div>
+        ))}
+      </div>
+
+      {/* User section at bottom */}
+      <div style={{
+        borderTop: "1px solid var(--border-color)",
+        padding: "1rem 0.5rem",
+        opacity: isCollapsed ? 0 : 1,
+        transition: "opacity 0.3s ease",
+        marginTop: "auto",
+        position: "relative"
+      }}>
+        <button
+          className="user-profile-trigger"
+          onClick={toggleUserMenu}
+          style={{
+            width: "100%",
+            padding: "0.5rem",
+            backgroundColor: "transparent",
+            border: "1px solid var(--border-color)",
+            borderRadius: "6px",
+            color: "var(--text-dark)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            fontSize: "0.875rem",
+            transition: "all 0.2s ease"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--background-light)";
+            e.currentTarget.style.borderColor = "var(--primary-color)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.borderColor = "var(--border-color)";
+          }}
+        >
+          <i className="fas fa-user-circle"></i>
+          <span>{username || "User"}</span>
+          <i className="fas fa-chevron-down" style={{ marginLeft: "auto", fontSize: "0.75rem" }}></i>
+        </button>
+
+        {showUserMenu && (
+          <div className="user-menu" style={{
+            position: "absolute",
+            bottom: "100%",
+            left: "0.5rem",
+            right: "0.5rem",
+            backgroundColor: "var(--white)",
+            borderRadius: "6px",
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+            padding: "0.5rem",
+            zIndex: 1000,
+            marginBottom: "0.5rem",
+            animation: "menuFadeIn 0.2s ease"
+          }}>
+            <div style={{
+              padding: "0.5rem",
+              borderBottom: "1px solid var(--border-color)",
+              marginBottom: "0.5rem"
+            }}>
+              <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{username || "User"}</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-light)" }}>Signed in</div>
+            </div>
+            
+            <button
+              className="file-menu-item"
+              onClick={handleProfile}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                padding: "0.5rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem"
+              }}
+            >
+              <i className="fas fa-user"></i>
+              Profile
+            </button>
+            
+            <button
+              className="file-menu-item"
+              onClick={handleSettings}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                padding: "0.5rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem"
+              }}
+            >
+              <i className="fas fa-cog"></i>
+              Settings
+            </button>
+            
+            <button
+              className="file-menu-item"
+              onClick={toggleTheme}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                padding: "0.5rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem"
+              }}
+            >
+              <i className={`fas fa-${isDarkMode ? 'sun' : 'moon'}`}></i>
+              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            </button>
+            
+            <div style={{ 
+              height: "1px", 
+              backgroundColor: "var(--border-color)", 
+              margin: "0.5rem 0" 
+            }}></div>
+            
+            <button
+              className="file-menu-item"
+              onClick={handleLogout}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                padding: "0.5rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                color: "var(--error)"
+              }}
+            >
+              <i className="fas fa-sign-out-alt"></i>
+              Logout
+            </button>
           </div>
         )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete confirmation modal */}
       {showDeleteConfirm && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "var(--white)",
-              padding: "2rem",
-              borderRadius: "8px",
-              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-              maxWidth: "400px",
-              width: "90%",
-            }}
-          >
-            <h3
-              style={{
-                color: "var(--text-dark)",
-                marginBottom: "1rem",
-              }}
-            >
-              Delete File
-            </h3>
-            <p
-              style={{
-                color: "var(--text-dark)",
-                marginBottom: "1.5rem",
-              }}
-            >
-              Are you sure you want to delete "{fileToDelete?.filename}"? This
-              action cannot be undone.
-            </p>
-            <div
-              style={{
-                display: "flex",
-                gap: "1rem",
-                justifyContent: "flex-end",
-              }}
-            >
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1100
+        }}>
+          <div style={{
+            backgroundColor: "var(--white)",
+            padding: "1.5rem",
+            borderRadius: "8px",
+            width: "90%",
+            maxWidth: "400px"
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Delete File</h3>
+            <p>Are you sure you want to delete {fileToDelete?.filename}?</p>
+            <div style={{
+              display: "flex",
+              gap: "1rem",
+              justifyContent: "flex-end",
+              marginTop: "1.5rem"
+            }}>
               <button
                 onClick={handleDeleteCancel}
                 style={{
                   padding: "0.5rem 1rem",
-                  backgroundColor: "var(--white)",
-                  border: "1px solid var(--border-color)",
+                  backgroundColor: "var(--background-light)",
+                  border: "none",
                   borderRadius: "4px",
-                  cursor: "pointer",
-                  color: "var(--text-dark)",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--background-light)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--white)";
+                  cursor: "pointer"
                 }}
               >
                 Cancel
@@ -700,17 +601,10 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
                 style={{
                   padding: "0.5rem 1rem",
                   backgroundColor: "var(--error)",
+                  color: "var(--white)",
                   border: "none",
                   borderRadius: "4px",
-                  cursor: "pointer",
-                  color: "var(--white)",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--error-dark)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--error)";
+                  cursor: "pointer"
                 }}
               >
                 Delete
@@ -724,3 +618,22 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
 };
 
 export default Sidebar;
+
+// Helper function to get file icon based on file type
+function getFileIcon(fileType) {
+  switch (fileType) {
+    case 'csv':
+      return 'file-csv';
+    case 'xlsx':
+      return 'file-excel';
+    case 'pdf':
+      return 'file-pdf';
+    case 'txt':
+      return 'file-alt';
+    case 'json':
+    case 'jsonl':
+      return 'file-code';
+    default:
+      return 'file';
+  }
+}
