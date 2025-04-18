@@ -118,8 +118,13 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
     setFileToDelete(null);
   };
 
-  const toggleSidebar = () => {
+  const handleSidebarToggle = () => {
     setIsCollapsed(!isCollapsed);
+    // Dispatch custom event for sidebar toggle
+    const event = new CustomEvent('sidebarToggle', { 
+      detail: { collapsed: !isCollapsed } 
+    });
+    window.dispatchEvent(event);
     onToggle(!isCollapsed);
   };
 
@@ -228,7 +233,7 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
     >
       {/* Toggle button */}
       <button
-        onClick={toggleSidebar}
+        onClick={handleSidebarToggle}
         style={{
           position: "absolute",
           top: "1rem",

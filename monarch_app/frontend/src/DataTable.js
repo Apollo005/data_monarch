@@ -6,6 +6,7 @@ const DataTable = ({ data, fileId, onPageChange }) => {
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState(null);
   const [statsPosition, setStatsPosition] = useState({ x: 0, y: 0 });
+  const [selectedColumn, setSelectedColumn] = useState(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -18,6 +19,23 @@ const DataTable = ({ data, fileId, onPageChange }) => {
   // Add more robust null checks
   const keys = data && Array.isArray(data) && data.length > 0 ? Object.keys(data[0]) : [];
   const totalRowsFromData = data && Array.isArray(data) ? data.length : 0;
+
+  // Get sidebar state from parent component
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // Listen for sidebar toggle events
+  useEffect(() => {
+    const handleSidebarToggle = (event) => {
+      if (event.detail && typeof event.detail.collapsed === 'boolean') {
+        setSidebarCollapsed(event.detail.collapsed);
+      }
+    };
+    
+    window.addEventListener('sidebarToggle', handleSidebarToggle);
+    return () => {
+      window.removeEventListener('sidebarToggle', handleSidebarToggle);
+    };
+  }, []);
 
   // Fetch paginated data when fileId, currentPage, or pageSize changes
   useEffect(() => {
@@ -135,12 +153,13 @@ const DataTable = ({ data, fileId, onPageChange }) => {
   const handleColumnHover = React.useCallback((e, column) => {
     if (!showStats) return;
     setStats(calculateStats(column));
+    setSelectedColumn(column);
   }, [showStats, paginatedData]);
 
   // Handle column hover out
   const handleColumnHoverOut = () => {
     if (!showStats) return;
-    setStats(null);
+    // Don't clear stats when hovering out to keep the sidebar visible
   };
 
   // Filter data based on search query
@@ -302,10 +321,19 @@ const DataTable = ({ data, fileId, onPageChange }) => {
     return pageNumbers;
   };
 
+  // Toggle stats sidebar
+  const toggleStatsSidebar = () => {
+    setShowStats(!showStats);
+    if (!showStats && selectedColumn) {
+      setStats(calculateStats(selectedColumn));
+    }
+  };
+
   return (
     <div style={{
       width: '100%',
-      marginTop: '1rem'
+      marginTop: '1rem',
+      position: 'relative'
     }}>
       {/* Search bar and row count display */}
       <div style={{
@@ -367,7 +395,7 @@ const DataTable = ({ data, fileId, onPageChange }) => {
             </div>
           )}
           <button
-            onClick={() => setShowStats(!showStats)}
+            onClick={toggleStatsSidebar}
             style={{
               backgroundColor: showStats ? 'var(--primary-color)' : 'var(--white)',
               color: showStats ? 'var(--white)' : 'var(--text-dark)',
@@ -401,51 +429,137 @@ const DataTable = ({ data, fileId, onPageChange }) => {
         </div>
       </div>
 
-      {/* Statistics Popup */}
+      {/* Statistics Sidebar */}
       {stats && showStats && (
         <div style={{
           position: 'fixed',
-          left: '50%',
-          top: '10%',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: 'var(--white)',
-          borderRadius: '8px',
-          padding: '1.5rem',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          bottom: 0,
+          left: sidebarCollapsed ? '116px' : '295px', // Adjust based on sidebar state
+          right: 54,
+          backgroundColor: 'var(--card-bg)',
+          borderRadius: '8px 8px 0 0',
+          padding: '1rem',
+          boxShadow: '0 -4px 6px rgba(0, 0, 0, 0.1)',
           zIndex: 1000,
-          minWidth: '300px',
-          border: '1px solid var(--border-color)'
+          border: '1px solid var(--border-color)',
+          display: 'flex',
+          height: '220px', // Reduced height
+          transition: 'all 0.3s ease'
         }}>
+          {/* Left side - Statistics */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '1rem',
-            fontSize: '0.875rem'
+            flex: '1',
+            paddingRight: '1rem',
+            borderRight: '1px solid var(--border-color)',
+            overflowY: 'auto'
           }}>
-            <div style={{ fontWeight: '500', color: 'var(--text-dark)', textAlign: 'center' }}>Min</div>
-            <div style={{ fontWeight: '500', color: 'var(--text-dark)', textAlign: 'center' }}>Average</div>
-            <div style={{ fontWeight: '500', color: 'var(--text-dark)', textAlign: 'center' }}>Max</div>
-            <div style={{ color: 'var(--text-dark)', textAlign: 'center' }}>{stats.min}</div>
-            <div style={{ color: 'var(--text-dark)', textAlign: 'center' }}>{stats.average}</div>
-            <div style={{ color: 'var(--text-dark)', textAlign: 'center' }}>{stats.max}</div>
-            <div style={{ fontWeight: '500', color: 'var(--text-dark)', textAlign: 'center' }}>Range</div>
-            <div style={{ fontWeight: '500', color: 'var(--text-dark)', textAlign: 'center' }}>Mode</div>
-            <div style={{ fontWeight: '500', color: 'var(--text-dark)', textAlign: 'center' }}>Median</div>
-            <div style={{ color: 'var(--text-dark)', textAlign: 'center' }}>{stats.range}</div>
-            <div style={{ color: 'var(--text-dark)', textAlign: 'center' }}>{stats.mode}</div>
-            <div style={{ color: 'var(--text-dark)', textAlign: 'center' }}>{stats.median}</div>
-          </div>
-          {stats.note && (
             <div style={{
-              marginTop: '1rem',
-              fontSize: '0.75rem',
-              color: 'var(--text-light)',
-              textAlign: 'center',
-              fontStyle: 'italic'
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '0.75rem'
             }}>
-              {stats.note}
+              <h3 style={{ 
+                color: 'var(--text-dark)', 
+                margin: 0,
+                fontSize: '0.95rem',
+                fontWeight: '600'
+              }}>
+                Statistics for {selectedColumn}
+              </h3>
+              <button
+                onClick={toggleStatsSidebar}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-light)',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  padding: '0.25rem',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--background-light)';
+                  e.currentTarget.style.color = 'var(--text-dark)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-light)';
+                }}
+              >
+                <i className="fas fa-times"></i>
+              </button>
             </div>
-          )}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '0.75rem',
+              fontSize: '0.8rem'
+            }}>
+              <div style={{ fontWeight: '500', color: 'var(--text-dark)' }}>Min</div>
+              <div style={{ color: 'var(--text-dark)' }}>{stats.min}</div>
+              <div style={{ fontWeight: '500', color: 'var(--text-dark)' }}>Average</div>
+              <div style={{ color: 'var(--text-dark)' }}>{stats.average}</div>
+              <div style={{ fontWeight: '500', color: 'var(--text-dark)' }}>Max</div>
+              <div style={{ color: 'var(--text-dark)' }}>{stats.max}</div>
+              <div style={{ fontWeight: '500', color: 'var(--text-dark)' }}>Range</div>
+              <div style={{ color: 'var(--text-dark)' }}>{stats.range}</div>
+              <div style={{ fontWeight: '500', color: 'var(--text-dark)' }}>Mode</div>
+              <div style={{ color: 'var(--text-dark)' }}>{stats.mode}</div>
+              <div style={{ fontWeight: '500', color: 'var(--text-dark)' }}>Median</div>
+              <div style={{ color: 'var(--text-dark)' }}>{stats.median}</div>
+            </div>
+            {stats.note && (
+              <div style={{
+                marginTop: '0.75rem',
+                fontSize: '0.7rem',
+                color: 'var(--text-light)',
+                fontStyle: 'italic'
+              }}>
+                {stats.note}
+              </div>
+            )}
+          </div>
+          
+          {/* Right side - Line Plot Placeholder */}
+          <div style={{
+            flex: '1',
+            paddingLeft: '1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <h3 style={{ 
+              color: 'var(--text-dark)', 
+              margin: '0 0 0.75rem 0',
+              fontSize: '0.95rem',
+              fontWeight: '600'
+            }}>
+              Data Visualization
+            </h3>
+            <div style={{
+              width: '100%',
+              height: '150px', // Reduced height
+              backgroundColor: 'var(--background-light)',
+              borderRadius: '6px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              color: 'var(--text-light)',
+              fontSize: '0.8rem',
+              border: '1px dashed var(--border-color)'
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <i className="fas fa-chart-line" style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: 'var(--primary-color)' }}></i>
+                <p>Line plot visualization would appear here</p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -457,7 +571,8 @@ const DataTable = ({ data, fileId, onPageChange }) => {
         borderRadius: '8px',
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
         border: '1px solid var(--border-color)',
-        position: 'relative'
+        position: 'relative',
+        marginBottom: showStats ? '230px' : '0' // Adjusted margin when stats sidebar is shown
       }}>
         {isLoading && (
           <div style={{

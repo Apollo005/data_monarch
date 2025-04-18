@@ -242,9 +242,11 @@ body {
 
 /* Dashboard container */
 .dashboard {
-  background: var(--background-light);
   min-height: 100vh;
   padding: 2rem;
+  overflow: hidden;
+  width: 95%;
+  position: relative;
 }
 
 /* Sidebar styles */

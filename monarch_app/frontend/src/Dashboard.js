@@ -206,11 +206,11 @@ function Dashboard({ onLogout }) {
   };
 
   const tabs = [
-    { id: 'upload', label: 'Upload Data' },
-    { id: 'filter', label: 'Filter Data' },
-    { id: 'analyze', label: 'Analyze Data' },
-    { id: 'visualize', label: 'Visualize' },
-    { id: 'export', label: 'Export Data' }
+    { id: 'upload', label: 'Upload Data', icon: 'fa-upload' },
+    { id: 'filter', label: 'Filter Data', icon: 'fa-filter' },
+    { id: 'analyze', label: 'Analyze Data', icon: 'fa-chart-bar' },
+    { id: 'visualize', label: 'Visualize', icon: 'fa-chart-line' },
+    { id: 'export', label: 'Export Data', icon: 'fa-file-export' }
   ];
 
   const currentTabIndex = tabs.findIndex(tab => tab.id === activeTab);
@@ -506,7 +506,7 @@ function Dashboard({ onLogout }) {
                     onChange={(e) => setFilterQuery(e.target.value)}
                     placeholder="Enter your filter query (e.g., 'Remove rows with null values', 'Group by column X', 'Filter rows where column Y > 2')"
                     style={{
-                      width: '100%',
+                      width: '97.5%',
                       minHeight: '100px',
                       padding: '0.75rem',
                       borderRadius: '4px',
@@ -547,20 +547,6 @@ function Dashboard({ onLogout }) {
                     {error}
                   </div>
                 )}
-                <div className="filter-controls">
-                  <button
-                    onClick={() => setShowHistoryPopup(true)}
-                    className="btn"
-                  >
-                    <i className="fas fa-history"></i>
-                  </button>
-                  <button
-                    onClick={() => setShowOriginalDataPopup(true)}
-                    className="btn"
-                  >
-                    <i className="fas fa-table"></i>
-                  </button>
-                </div>
               </div>
             ) : (
               <div>
@@ -578,9 +564,10 @@ function Dashboard({ onLogout }) {
         );
       case 'analyze':
         return (
-          <div className="card">
-            <DataAnalysis data={uploadedData} />
-          </div>
+          <DataAnalysis 
+            data={uploadedData} 
+            fileId={selectedFile ? selectedFile.id : null} 
+          />
         );
       case 'visualize':
         return (
@@ -935,6 +922,20 @@ function Dashboard({ onLogout }) {
               <button className="icon-button" title="Summarize">
                 <i className="fas fa-list"></i>
               </button>
+              <button 
+                className="icon-button" 
+                title="History"
+                onClick={() => setShowHistoryPopup(true)}
+              >
+                <i className="fas fa-history"></i>
+              </button>
+              <button 
+                className="icon-button" 
+                title="View Data"
+                onClick={() => setShowOriginalDataPopup(true)}
+              >
+                <i className="fas fa-table"></i>
+              </button>
             </div>
           </div>
 
@@ -947,32 +948,37 @@ function Dashboard({ onLogout }) {
             <button
               onClick={() => setActiveTab('upload')}
               className={`header-tab ${activeTab === 'upload' ? 'active' : ''}`}
+              title="Upload Data"
             >
-              Upload Data
+              <i className={`fas ${tabs[0].icon}`}></i>
             </button>
             <button
               onClick={() => setActiveTab('filter')}
               className={`header-tab ${activeTab === 'filter' ? 'active' : ''}`}
+              title="Filter Data"
             >
-              Filter Data
+              <i className={`fas ${tabs[1].icon}`}></i>
             </button>
             <button
               onClick={() => setActiveTab('analyze')}
               className={`header-tab ${activeTab === 'analyze' ? 'active' : ''}`}
+              title="Analyze Data"
             >
-              Analyze Data
+              <i className={`fas ${tabs[2].icon}`}></i>
             </button>
             <button
               onClick={() => setActiveTab('visualize')}
               className={`header-tab ${activeTab === 'visualize' ? 'active' : ''}`}
+              title="Visualize"
             >
-              Visualize
+              <i className={`fas ${tabs[3].icon}`}></i>
             </button>
             <button
               onClick={() => setActiveTab('export')}
               className={`header-tab ${activeTab === 'export' ? 'active' : ''}`}
+              title="Export Data"
             >
-              Export Data
+              <i className={`fas ${tabs[4].icon}`}></i>
             </button>
           </div>
         </div>
@@ -980,11 +986,20 @@ function Dashboard({ onLogout }) {
         {/* Main Content Area */}
         <div style={{ 
           flex: 1, 
-          padding: '1.5rem', 
-          backgroundColor: 'var(--background-light)',
-          overflowY: 'auto' 
+          padding: '1.5rem',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
         }}>
-          <div className="card" style={{ height: '100%' }}>
+          <div style={{ 
+            flex: 1,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'var(--card-bg)',
+            borderRadius: '8px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+          }}>
             {renderTabContent()}
           </div>
         </div>
