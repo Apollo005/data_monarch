@@ -319,7 +319,9 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
         overflowY: "auto",
         marginTop: "1rem",
         opacity: isCollapsed ? 0 : 1,
-        transition: "opacity 0.3s ease"
+        transition: "opacity 0.3s ease",
+        pointerEvents: isCollapsed ? "none" : "auto",
+        visibility: isCollapsed ? "hidden" : "visible"
       }}>
         {error && (
           <p style={{

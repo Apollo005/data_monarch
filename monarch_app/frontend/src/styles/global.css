@@ -25,12 +25,12 @@
 /* Dark theme variables */
 [data-theme="dark"] {
   --primary-color: #9F7AEA;
-  --primary-light: #B794F4;
-  --primary-dark: rgb(139, 116, 195);
+  --primary-light: #000000;
+  --primary-dark: rgb(79, 78, 85);
   --secondary-color: #63B3ED;
   --secondary-light: #90CDF4;
   --secondary-dark: #4299E1;
-  --background-light: linear-gradient(135deg, #1A202C 0%, #553C9A 100%);
+  --background-light: linear-gradient(180deg, #1A202C 0%, #3d3264 100%);
   --text-dark: #E2E8F0;
   --text-light: #A0AEC0;
   --white: #2D3748;
@@ -243,10 +243,20 @@ body {
 /* Dashboard container */
 .dashboard {
   min-height: 100vh;
+  height: auto;
   padding: 2rem;
-  overflow: hidden;
+  overflow: visible;
   width: 95%;
   position: relative;
+}
+
+/* Update content container */
+.dashboard-content {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Sidebar styles */
@@ -567,4 +577,165 @@ button:hover {
 button:active {
   transform: translateY(0);
   box-shadow: none;
+}
+
+/* Tab content container styles */
+.tab-content-container {
+  padding: 2rem;
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: auto;
+  min-height: 200px;
+  width: 90%;
+  margin: 0 auto;
+  margin-top: 1rem;
+  position: relative;
+  overflow: visible;
+}
+
+.tab-content-header {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tab-content-header h2 {
+  color: var(--text-dark);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.tab-content-body {
+  height: auto;
+  min-height: 200px;
+  width: 100%;
+  position: relative;
+}
+
+.tab-section {
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.tab-section:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.tab-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.tab-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tab-section-title i {
+  color: var(--primary-color);
+  font-size: 1rem;
+}
+
+/* Form controls within tabs */
+.tab-form-group {
+  margin-bottom: 1.5rem;
+}
+
+.tab-form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-dark);
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.tab-form-control {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--white);
+  color: var(--text-dark);
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.tab-form-control:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px var(--primary-color-light);
+}
+
+/* Button styles within tabs */
+.tab-button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--primary-color);
+  color: var(--white);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tab-button:hover:not(:disabled) {
+  background-color: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.tab-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.tab-button.secondary {
+  background-color: var(--background-light);
+  color: var(--text-dark);
+  border: 1px solid var(--border-color);
+}
+
+.tab-button.secondary:hover:not(:disabled) {
+  background-color: var(--primary-color-light);
+  color: var(--primary-color);
+}
+
+/* Grid layouts within tabs */
+.tab-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  margin-bottom: 1.5rem;
+}
+
+/* Card styles within tabs */
+.tab-card {
+  background-color: var(--white);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.tab-card:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }

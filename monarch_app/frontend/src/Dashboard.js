@@ -229,15 +229,22 @@ function Dashboard({ onLogout }) {
 
   const handleDataUpload = (data) => {
     setUploadedData(data);
+    setOriginalData(data); // Also set original data
     // Initialize history with uploaded data
     setDataHistory([data]);
     setCurrentHistoryIndex(0);
+    setHistoryDescriptions(['Initial data upload']);
+    setVersionNumbers([1]);
     // Initialize visible columns when data is uploaded
     const initialVisible = {};
     Object.keys(data[0] || {}).forEach(column => {
       initialVisible[column] = true;
     });
     setVisibleColumns(initialVisible);
+    // Reset filter-related state
+    setFilterQuery('');
+    setFilterDescription('');
+    setIsFiltering(false);
   };
 
   const handleUndo = () => {
@@ -429,25 +436,29 @@ function Dashboard({ onLogout }) {
   const renderTabContent = () => {
     if (isLoading) {
       return (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: '2rem'
-        }}>
-          <div className="loading-spinner" />
+        <div className="tab-content-container">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '200px'
+          }}>
+            <div className="loading-spinner" />
+          </div>
         </div>
       );
     }
 
     if (error) {
       return (
-        <div style={{
-          color: 'var(--error)',
-          padding: '1rem',
-          textAlign: 'center'
-        }}>
-          {error}
+        <div className="tab-content-container">
+          <div style={{
+            color: 'var(--error)',
+            padding: '1rem',
+            textAlign: 'center'
+          }}>
+            {error}
+          </div>
         </div>
       );
     }
@@ -455,106 +466,88 @@ function Dashboard({ onLogout }) {
     switch (activeTab) {
       case 'upload':
         return (
-          <div className="card">
+          <div className="tab-content-container">
             <FileUpload onDataUpload={handleDataUpload} existingData={uploadedData} />
           </div>
         );
       case 'filter':
         return (
-          <div className="card">
+          <div className="tab-content-container">
             {uploadedData ? (
               <div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '1rem'
-                }}>
-                  <h3 style={{ color: 'var(--text-dark)', margin: 0 }}>Filter Data</h3>
+                <div className="tab-content-header">
+                  <h2>Filter Data</h2>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                       onClick={handleUndo}
                       disabled={currentHistoryIndex <= 0}
-                      className="btn header-controls"
-                      style={{
-                        backgroundColor: currentHistoryIndex <= 0 ? 'var(--background-light)' : 'var(--primary-dark)',
-                        color: currentHistoryIndex <= 0 ? 'var(--text-light)' : 'var(--white)',
-                        cursor: currentHistoryIndex <= 0 ? 'not-allowed' : 'pointer',
-                        opacity: currentHistoryIndex <= 0 ? 0.5 : 1
-                      }}
+                      className="tab-button secondary"
+                      title="Undo"
                     >
                       <i className="fas fa-undo"></i>
                     </button>
                     <button
                       onClick={handleRedo}
                       disabled={currentHistoryIndex >= dataHistory.length - 1}
-                      className="btn header-controls"
-                      style={{
-                        backgroundColor: currentHistoryIndex >= dataHistory.length - 1 ? 'var(--background-light)' : 'var(--primary-dark)',
-                        color: currentHistoryIndex >= dataHistory.length - 1 ? 'var(--text-light)' : 'var(--white)',
-                        cursor: currentHistoryIndex >= dataHistory.length - 1 ? 'not-allowed' : 'pointer',
-                        opacity: currentHistoryIndex >= dataHistory.length - 1 ? 0.5 : 1
-                      }}
+                      className="tab-button secondary"
+                      title="Redo"
                     >
                       <i className="fas fa-redo"></i>
                     </button>
                   </div>
                 </div>
-                <div style={{ marginBottom: '1rem' }}>
-                  <textarea
-                    value={filterQuery}
-                    onChange={(e) => setFilterQuery(e.target.value)}
-                    placeholder="Enter your filter query (e.g., 'Remove rows with null values', 'Group by column X', 'Filter rows where column Y > 2')"
-                    style={{
-                      width: '97.5%',
-                      minHeight: '100px',
-                      padding: '0.75rem',
-                      borderRadius: '4px',
-                      border: '1px solid var(--border-color)',
-                      backgroundColor: 'var(--white)',
-                      color: 'var(--text-dark)',
-                      fontFamily: 'inherit',
-                      fontSize: '1rem',
-                      resize: 'vertical'
-                    }}
-                  />
+
+                <div className="tab-section">
+                  <div className="tab-form-group">
+                    <textarea
+                      value={filterQuery}
+                      onChange={(e) => setFilterQuery(e.target.value)}
+                      placeholder="Enter your filter query (e.g., 'Remove rows with null values', 'Group by column X', 'Filter rows where column Y > 2')"
+                      className="tab-form-control"
+                      style={{ minHeight: '100px', resize: 'vertical', width: '96.5%' }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleFilterSubmit}
+                    disabled={isFiltering || !filterQuery.trim()}
+                    className="tab-button"
+                  >
+                    {isFiltering ? 'Applying Filter...' : 'Apply Filter'}
+                  </button>
                 </div>
-                <button
-                  onClick={handleFilterSubmit}
-                  disabled={isFiltering || !filterQuery.trim()}
-                  className="btn apply-filter-btn"
-                >
-                  {isFiltering ? 'Applying Filter...' : 'Apply Filter'}
-                </button>
+
                 {filterDescription && (
-                  <div style={{
-                    padding: '1rem',
-                    backgroundColor: 'var(--background-light)',
-                    borderRadius: '4px',
-                    marginBottom: '1rem'
-                  }}>
-                    <strong>Applied Filter:</strong> {filterDescription}
+                  <div className="tab-section">
+                    <div className="tab-section-header">
+                      <div className="tab-section-title">
+                        <i className="fas fa-info-circle"></i>
+                        Applied Filter
+                      </div>
+                    </div>
+                    <div>{filterDescription}</div>
                   </div>
                 )}
+
                 {error && (
-                  <div style={{
-                    color: 'var(--error)',
-                    padding: '1rem',
-                    backgroundColor: 'var(--background-light)',
-                    borderRadius: '4px',
-                    marginBottom: '1rem'
-                  }}>
-                    {error}
+                  <div className="tab-section" style={{ borderColor: 'var(--error)' }}>
+                    <div className="tab-section-header">
+                      <div className="tab-section-title" style={{ color: 'var(--error)' }}>
+                        <i className="fas fa-exclamation-circle"></i>
+                        Error
+                      </div>
+                    </div>
+                    <div style={{ color: 'var(--error)' }}>{error}</div>
                   </div>
                 )}
               </div>
             ) : (
-              <div>
-                <p style={{ color: 'var(--error)' }}>Please upload data first before filtering.</p>
+              <div className="tab-content-body" style={{ textAlign: 'center', padding: '2rem' }}>
+                <p style={{ color: 'var(--text-light)', marginBottom: '1rem' }}>
+                  Please upload data first before filtering.
+                </p>
                 <button 
                   onClick={() => setActiveTab('upload')}
-                  className="btn btn-primary"
-                  style={{ marginTop: '1rem' }}
+                  className="tab-button"
                 >
                   Go to Upload
                 </button>
@@ -564,22 +557,37 @@ function Dashboard({ onLogout }) {
         );
       case 'analyze':
         return (
-          <DataAnalysis 
-            data={uploadedData} 
-            fileId={selectedFile ? selectedFile.id : null} 
-          />
+          <div className="tab-content-container">
+            <DataAnalysis 
+              data={uploadedData} 
+              fileId={selectedFile ? selectedFile.id : null} 
+            />
+          </div>
         );
       case 'visualize':
         return (
-          <div className="card">
+          <div className="tab-content-container">
+            <div className="tab-content-header">
+              <h2>Data Visualization</h2>
+            </div>
             <DataVisualization data={uploadedData} />
           </div>
         );
       case 'export':
         return (
-          <div className="card">
-            <h2>Export Data</h2>
-            <p>Export functionality coming soon...</p>
+          <div className="tab-content-container">
+            <div className="tab-content-header">
+              <h2>Export Data</h2>
+            </div>
+            <div className="tab-section">
+              <div className="tab-section-header">
+                <div className="tab-section-title">
+                  <i className="fas fa-file-export"></i>
+                  Export Options
+                </div>
+              </div>
+              <p style={{ color: 'var(--text-light)' }}>Export functionality coming soon...</p>
+            </div>
           </div>
         );
       default:
@@ -848,11 +856,13 @@ function Dashboard({ onLogout }) {
         onToggle={handleSidebarToggle}
       />
       <div 
+        className="dashboard-content"
         style={{ 
           marginLeft: isSidebarCollapsed ? '60px' : '240px',
           padding: '0',
           transition: 'margin-left 0.3s ease',
-          height: '100vh',
+          height: 'auto',
+          minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column'
         }}
@@ -983,32 +993,16 @@ function Dashboard({ onLogout }) {
           </div>
         </div>
 
-        {/* Main Content Area */}
-        <div style={{ 
-          flex: 1, 
-          padding: '1.5rem',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          <div style={{ 
-            flex: 1,
-            width: '100%',
-            height: '100%',
-            backgroundColor: 'var(--card-bg)',
-            borderRadius: '8px',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-          }}>
-            {renderTabContent()}
-          </div>
-        </div>
+        {renderTabContent()}
+
+        {renderHistoryPopup()}
+
+        {renderDeleteConfirm()}
+
+        {renderOriginalDataPopup()}
       </div>
-      {renderHistoryPopup()}
-      {renderDeleteConfirm()}
-      {renderOriginalDataPopup()}
     </div>
   );
 }
 
-export default Dashboard; 
+export default Dashboard;

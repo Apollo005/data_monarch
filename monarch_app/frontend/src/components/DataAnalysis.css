@@ -1,10 +1,12 @@
 .analysis-container {
   padding: 2rem;
   background-color: var(--background-color);
-  height: 100%;
+  height: auto;
+  min-height: 100%;
   width: 100%;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  margin-left: 5%;
 }
 
 .analysis-header {
@@ -59,8 +61,10 @@
     "selection results"
     "chart chart";
   grid-template-columns: minmax(300px, 400px) 1fr;
+  gap: 2rem;
   align-items: start;
   max-width: 100%;
+  min-height: 100%;
 }
 
 .selection-card {
@@ -81,9 +85,13 @@
   grid-area: chart;
   margin-top: 1%;
   margin-left: 0%;
-  max-width: 83%;
-  padding: 0rem;
-  height: 0%;
+  width: 80%;
+  max-width: 100%;
+  padding: 1rem;
+  height: auto;
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .results-card {
@@ -511,13 +519,6 @@
   color: var(--primary-color);
 }
 
-.chart-container {
-  height: 200px;
-  background-color: var(--card-bg);
-  border-radius: 12px;
-  transition: all 0.3s ease;
-  margin-bottom: 1%;
-}
 
 .chart-container:hover {
   transform: translateY(-2px);

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import DataTable from "./DataTable";
 import config from './config';
@@ -11,6 +11,20 @@ const FileUpload = ({ onDataUpload, existingData }) => {
   const [showColumnInput, setShowColumnInput] = useState(false);
   const [columnError, setColumnError] = useState("");
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    setFileData(existingData);
+    if (!existingData) {
+      setFile(null);
+      setMessage("");
+      setColumnNames("");
+      setShowColumnInput(false);
+      setColumnError("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }, [existingData]);
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
