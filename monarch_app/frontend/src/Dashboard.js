@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FileUpload from './FileUpload';
 import Sidebar from './SideBar';
@@ -32,6 +32,8 @@ function Dashboard({ onLogout }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [versionNumbers, setVersionNumbers] = useState([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
+  const [showSummarizeDropdown, setShowSummarizeDropdown] = useState(false);
 
   const handleLogout = () => {
     onLogout();
@@ -377,6 +379,32 @@ function Dashboard({ onLogout }) {
   const handleSidebarToggle = (collapsed) => {
     setIsSidebarCollapsed(collapsed);
   };
+
+  // Add click handlers for dropdowns
+  const handleAddClick = (event) => {
+    event.stopPropagation();
+    setShowAddDropdown(!showAddDropdown);
+    setShowSummarizeDropdown(false);
+  };
+
+  const handleSummarizeClick = (event) => {
+    event.stopPropagation();
+    setShowSummarizeDropdown(!showSummarizeDropdown);
+    setShowAddDropdown(false);
+  };
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.dropdown-container')) {
+        setShowAddDropdown(false);
+        setShowSummarizeDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const renderDataTable = () => {
     if (!uploadedData) return null;
@@ -920,18 +948,99 @@ function Dashboard({ onLogout }) {
               borderLeft: '1px solid var(--border-color)',
               paddingLeft: '1rem'
             }}>
-              <button className="icon-button" title="Add">
-                <i className="fas fa-plus"></i>
-              </button>
+              {/* Add Button with Dropdown */}
+              <div className="dropdown-container" style={{ position: 'relative' }}>
+                <button 
+                  className="icon-button" 
+                  title="Add/Edit"
+                  onClick={handleAddClick}
+                >
+                  <i className="fas fa-plus"></i>
+                </button>
+                {showAddDropdown && (
+                  <div className="dropdown-menu" style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '0',
+                    backgroundColor: 'var(--card-bg)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                    padding: '0.5rem 0',
+                    minWidth: '150px',
+                    zIndex: 1000,
+                    marginTop: '0.5rem'
+                  }}>
+                    <button className="dropdown-item" onClick={() => console.log('Add Row clicked')}>
+                      <i className="fas fa-plus-circle"></i>
+                      Add Row
+                    </button>
+                    <button className="dropdown-item" onClick={() => console.log('Edit Table clicked')}>
+                      <i className="fas fa-edit"></i>
+                      Edit Table
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <button className="icon-button" title="Delete">
                 <i className="fas fa-trash"></i>
               </button>
               <button className="icon-button" title="Copy">
                 <i className="fas fa-copy"></i>
               </button>
-              <button className="icon-button" title="Summarize">
-                <i className="fas fa-list"></i>
-              </button>
+
+              {/* Summarize Button with Dropdown */}
+              <div className="dropdown-container" style={{ position: 'relative' }}>
+                <button 
+                  className="icon-button" 
+                  title="Summarize"
+                  onClick={handleSummarizeClick}
+                >
+                  <i className="fas fa-list"></i>
+                </button>
+                {showSummarizeDropdown && (
+                  <div className="dropdown-menu" style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '0',
+                    backgroundColor: 'var(--card-bg)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                    padding: '0.5rem 0',
+                    minWidth: '150px',
+                    zIndex: 1000,
+                    marginTop: '0.5rem'
+                  }}>
+                    <button className="dropdown-item" onClick={() => console.log('SUM clicked')}>
+                      <i className="fas fa-plus"></i>
+                      SUM
+                    </button>
+                    <button className="dropdown-item" onClick={() => console.log('AVERAGE clicked')}>
+                      <i className="fas fa-calculator"></i>
+                      AVERAGE
+                    </button>
+                    <button className="dropdown-item" onClick={() => console.log('MIN clicked')}>
+                      <i className="fas fa-arrow-down"></i>
+                      MIN
+                    </button>
+                    <button className="dropdown-item" onClick={() => console.log('MAX clicked')}>
+                      <i className="fas fa-arrow-up"></i>
+                      MAX
+                    </button>
+                    <button className="dropdown-item" onClick={() => console.log('COUNT clicked')}>
+                      <i className="fas fa-hashtag"></i>
+                      COUNT
+                    </button>
+                    <button className="dropdown-item" onClick={() => console.log('PRODUCT clicked')}>
+                      <i className="fas fa-times"></i>
+                      PRODUCT
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <button 
                 className="icon-button" 
                 title="History"

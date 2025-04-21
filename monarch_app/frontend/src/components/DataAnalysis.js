@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { analyzeData } from '../utils/analysis';
 import config from '../config';
 import './DataAnalysis.css';
+import DesmosCalculator from './DesmosCalculator';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -41,6 +42,8 @@ const DataAnalysis = ({ data, fileId }) => {
   const [selectedFeatureForView, setSelectedFeatureForView] = useState(null);
   const [showRunButton, setShowRunButton] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [desmosEquation, setDesmosEquation] = useState('');
 
   // Chart options
   const chartOptions = {
@@ -309,7 +312,50 @@ const DataAnalysis = ({ data, fileId }) => {
     setRegressionError(null);
   };
 
-  // Perform regression analysis
+  // Update the convertToDesmos function to handle multi-dimensional data
+  const convertToDesmos = (equation) => {
+    if (!equation) return '';
+    
+    // Remove 'y = ' from the start
+    let desmosEq = equation.replace(/^y\s*=\s*/, '');
+    
+    // Replace multiplication symbol × with *
+    desmosEq = desmosEq.replace(/×/g, '*');
+    
+    // Replace any spaces around operators
+    desmosEq = desmosEq.replace(/\s*([+\-*])\s*/g, '$1');
+
+    // Replace variable names with x₁, x₂, etc.
+    let varCounter = 1;
+    const varMap = {};
+    
+    // Find all variable names (words not followed by a number)
+    const varNames = Array.from(new Set(
+      desmosEq.match(/[a-zA-Z_][a-zA-Z0-9_]*(?!\d)/g) || []
+    ));
+    
+    // Create mapping for variable names
+    varNames.forEach(varName => {
+      if (varName !== 'x' && varName !== 'y') {
+        varMap[varName] = `x_{${varCounter}}`;
+        varCounter++;
+      }
+    });
+    
+    // Replace variable names with their Desmos counterparts
+    Object.entries(varMap).forEach(([varName, desmosVar]) => {
+      const regex = new RegExp(`\\b${varName}\\b`, 'g');
+      desmosEq = desmosEq.replace(regex, desmosVar);
+    });
+
+    // Add y= back to the equation
+    desmosEq = `y=${desmosEq}`;
+
+    console.log('Converted equation for Desmos:', desmosEq);
+    return desmosEq;
+  };
+
+  // Update handleRegressionSubmit to set the Desmos equation
   const handleRegressionSubmit = async () => {
     if (!targetColumn || featureColumns.length === 0) {
       setRegressionError('Please select a target column and at least one feature column');
@@ -355,6 +401,11 @@ const DataAnalysis = ({ data, fileId }) => {
       }
 
       setRegressionResults(responseData);
+      
+      // Convert and set the Desmos equation
+      if (responseData.equation) {
+        setDesmosEquation(convertToDesmos(responseData.equation));
+      }
     } catch (error) {
       console.error('Regression error:', error);
       setRegressionError(error.message || 'An error occurred during regression analysis');
@@ -467,6 +518,11 @@ const DataAnalysis = ({ data, fileId }) => {
     setShowToolbar(targetColumn && featureColumns.length > 0);
   }, [targetColumn, featureColumns]);
 
+  // Update the calculator button click handler
+  const handleCalculatorClick = () => {
+    setShowCalculator(!showCalculator);
+  };
+
   if (!data || data.length === 0) {
     return (
       <div className="analysis-container">
@@ -483,9 +539,10 @@ const DataAnalysis = ({ data, fileId }) => {
       {/* Add toolbar */}
       <div className={`analysis-toolbar ${showToolbar ? 'active' : ''}`}>
         <button 
-          className="toolbar-button" 
-          title="Calculate Statistics"
-          onClick={() => console.log('Calculate clicked')}
+          className={`toolbar-button ${!regressionResults ? 'disabled' : ''}`}
+          title="Show Calculator"
+          onClick={handleCalculatorClick}
+          disabled={!regressionResults}
         >
           <i className="fas fa-calculator"></i>
         </button>
@@ -622,9 +679,13 @@ const DataAnalysis = ({ data, fileId }) => {
         {regressionResults && (
           <>
             <div className="analysis-card chart-card">
-              <div className="chart-container">
-                <Bar options={chartOptions} data={getChartData()} />
-              </div>
+              {showCalculator ? (
+                <DesmosCalculator equation={desmosEquation} />
+              ) : (
+                <div className="chart-container">
+                  <Bar options={chartOptions} data={getChartData()} />
+                </div>
+              )}
             </div>
 
             <div className="analysis-card results-card">
