@@ -7,7 +7,7 @@ const DesmosCalculator = ({ equation }) => {
   useEffect(() => {
     // Load Desmos script dynamically
     const script = document.createElement('script');
-    script.src = 'https://www.desmos.com/api/v1.10/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6';
+    script.src = `https://www.desmos.com/api/v1.10/calculator.js?apiKey=${process.env.REACT_APP_DESMOS_API_KEY}`;
     script.async = true;
     script.onload = () => {
       // Initialize calculator after script loads
