@@ -417,7 +417,7 @@ const DataTable = ({ data, fileId, onPageChange }) => {
         </div>
         <div style={{
           backgroundColor: 'var(--primary-color)',
-          color: 'var(--white)',
+          color: 'white',
           padding: '0.5rem 1rem',
           borderRadius: '4px',
           fontSize: '0.875rem',

@@ -907,7 +907,7 @@ function Dashboard({ onLogout }) {
         }}>
           {/* Left side - Dropdowns */}
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            {/* Dashboard Dropdown */}
+            {/* My Workspace Dropdown */}
             <div className="dropdown" style={{ position: 'relative' }}>
               <button style={{
                 padding: '0.5rem 1rem',
@@ -920,24 +920,7 @@ function Dashboard({ onLogout }) {
                 gap: '0.5rem',
                 fontSize: '0.9rem'
               }}>
-                Dashboard <i className="fas fa-chevron-down"></i>
-              </button>
-            </div>
-
-            {/* Actions Dropdown */}
-            <div className="dropdown" style={{ position: 'relative' }}>
-              <button style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: 'transparent',
-                border: 'none',
-                color: 'var(--text-dark)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.9rem'
-              }}>
-                Actions <i className="fas fa-chevron-down"></i>
+                My Workspace <i className="fas fa-chevron-down"></i>
               </button>
             </div>
 
@@ -948,44 +931,6 @@ function Dashboard({ onLogout }) {
               borderLeft: '1px solid var(--border-color)',
               paddingLeft: '1rem'
             }}>
-              {/* Add Button with Dropdown */}
-              <div className="dropdown-container" style={{ position: 'relative' }}>
-                <button 
-                  className="icon-button" 
-                  title="Add/Edit"
-                  onClick={handleAddClick}
-                >
-                  <i className="fas fa-plus"></i>
-                </button>
-                {showAddDropdown && (
-                  <div className="dropdown-menu" style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: '0',
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                    padding: '0.5rem 0',
-                    minWidth: '150px',
-                    zIndex: 1000,
-                    marginTop: '0.5rem'
-                  }}>
-                    <button className="dropdown-item" onClick={() => console.log('Add Row clicked')}>
-                      <i className="fas fa-plus-circle"></i>
-                      Add Row
-                    </button>
-                    <button className="dropdown-item" onClick={() => console.log('Edit Table clicked')}>
-                      <i className="fas fa-edit"></i>
-                      Edit Table
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button className="icon-button" title="Delete">
-                <i className="fas fa-trash"></i>
-              </button>
               <button className="icon-button" title="Copy">
                 <i className="fas fa-copy"></i>
               </button>
@@ -1061,9 +1006,19 @@ function Dashboard({ onLogout }) {
           {/* Right side - Tabs */}
           <div style={{
             display: 'flex',
-            gap: '0.5rem',
+            gap: '1rem',
             alignItems: 'center'
           }}>
+            <button 
+                onClick={() => navigate('/ai-analyst', { 
+                  state: { currentFile: selectedFile }
+                })}
+                className="pro-ai-button"
+                title="AI Data Analyst Pro"
+              >
+                <span className="pro-ai-text">AI Analyst</span>
+                <span className="pro-badge">PRO</span>
+            </button>
             <button
               onClick={() => setActiveTab('upload')}
               className={`header-tab ${activeTab === 'upload' ? 'active' : ''}`}
