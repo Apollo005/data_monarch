@@ -8,18 +8,24 @@
   --secondary-color: #D9B08C;
   --secondary-light: #FFCB9A;
   --secondary-dark: #D9B08C;
-  --background-light: linear-gradient(135deg, #2C3531 0%, #116466 100%);
-  --text-dark: #D1E8E2;
-  --text-light: #FFCB9A;
-  --white: #D1E8E2;
+  --background-light: linear-gradient(135deg, #E8F6F3 0%, #B8E0D2 100%);
+  --text-dark: #2C3531;
+  --text-light: #116466;
+  --white: #FFFFFF;
   --black: #2C3531;
   --error: #ff6b6b;
   --success: #51cf66;
-  --border-color: rgba(209, 232, 226, 0.2);
-  --card-bg: rgba(44, 53, 49, 0.95);
+  --border-color: rgba(17, 100, 102, 0.2);
+  --card-bg: rgba(255, 255, 255, 0.95);
   --hover-bg: rgba(17, 100, 102, 0.1);
   --table-header-bg: rgba(17, 100, 102, 0.1);
   --table-row-hover: rgba(17, 100, 102, 0.05);
+  --shadow-color: rgba(17, 100, 102, 0.1);
+  --input-bg: #FFFFFF;
+  --input-border: #D1E8E2;
+  --input-focus: #116466;
+  --button-hover: #0D4D4D;
+  --button-active: #0A3D3D;
 }
 
 /* Dark theme variables */
@@ -30,7 +36,7 @@
   --secondary-color: #D9B08C;
   --secondary-light: #FFCB9A;
   --secondary-dark: #D9B08C;
-  --background-light: linear-gradient(270deg, #292929 0%, #191b1b 100%);
+  --background-light: linear-gradient(270deg, #1A2F2F 0%, #0D1F1F 100%);
   --text-dark: #D1E8E2;
   --text-light: #FFCB9A;
   --white: #2C3531;
@@ -42,6 +48,12 @@
   --hover-bg: rgba(17, 100, 102, 0.1);
   --table-header-bg: rgba(17, 100, 102, 0.1);
   --table-row-hover: rgba(17, 100, 102, 0.05);
+  --shadow-color: rgba(0, 0, 0, 0.2);
+  --input-bg: #2C3531;
+  --input-border: #116466;
+  --input-focus: #D1E8E2;
+  --button-hover: #0D4D4D;
+  --button-active: #0A3D3D;
 }
 
 body {
@@ -73,12 +85,12 @@ body {
   letter-spacing: 0.5px;
   text-transform: uppercase;
   font-size: 0.875rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--shadow-color);
 }
 
 .btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 6px var(--shadow-color);
 }
 
 .btn-primary {
@@ -87,7 +99,11 @@ body {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-dark);
+  background-color: var(--button-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  background-color: var(--button-active);
 }
 
 .btn-danger {
@@ -101,26 +117,26 @@ body {
 
 .input {
   padding: 0.5rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--input-border);
   border-radius: 0.375rem;
   width: 100%;
   font-size: 1rem;
   font-family: 'IBM Plex Mono', sans-serif;
   letter-spacing: 0.5px;
-  background-color: var(--card-bg);
+  background-color: var(--input-bg);
   color: var(--text-dark);
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--primary-light);
-  box-shadow: 0 0 0 3px rgba(159, 122, 234, 0.1);
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 3px var(--shadow-color);
 }
 
 .card {
   background-color: var(--card-bg);
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px var(--shadow-color);
   padding: 1.5rem;
   margin: 0;
 }
