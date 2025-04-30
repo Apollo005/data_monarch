@@ -7,6 +7,8 @@ const DataTable = ({ data, fileId, onPageChange }) => {
   const [stats, setStats] = useState(null);
   const [statsPosition, setStatsPosition] = useState({ x: 0, y: 0 });
   const [selectedColumn, setSelectedColumn] = useState(null);
+  const [selectedRows, setSelectedRows] = useState(new Set());
+  const [isSelecting, setIsSelecting] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -23,6 +25,51 @@ const DataTable = ({ data, fileId, onPageChange }) => {
   // Get sidebar state from parent component
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
+  // Filter data based on search query
+  const filteredData = paginatedData && Array.isArray(paginatedData) ? paginatedData.filter(row => {
+    if (!searchQuery) return true;
+    return Object.values(row).some(value => 
+      String(value).toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }) : [];
+
+  const getSortedData = () => {
+    if (!sortConfig.key || !sortConfig.direction) return filteredData;
+
+    return [...filteredData].sort((a, b) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+
+      // Handle numeric values (including decimals)
+      const aNum = parseFloat(aValue);
+      const bNum = parseFloat(bValue);
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return sortConfig.direction === 'asc' 
+          ? aNum - bNum
+          : bNum - aNum;
+      }
+
+      // Handle datetime values
+      const aDate = new Date(aValue);
+      const bDate = new Date(bValue);
+      if (!isNaN(aDate.getTime()) && !isNaN(bDate.getTime())) {
+        return sortConfig.direction === 'asc' 
+          ? aDate.getTime() - bDate.getTime()
+          : bDate.getTime() - aDate.getTime();
+      }
+
+      // Handle string values
+      const aString = String(aValue || '').toLowerCase();
+      const bString = String(bValue || '').toLowerCase();
+      
+      return sortConfig.direction === 'asc'
+        ? aString.localeCompare(bString)
+        : bString.localeCompare(aString);
+    });
+  };
+
+  const sortedData = getSortedData();
+  
   // Listen for sidebar toggle events
   useEffect(() => {
     const handleSidebarToggle = (event) => {
@@ -36,6 +83,57 @@ const DataTable = ({ data, fileId, onPageChange }) => {
       window.removeEventListener('sidebarToggle', handleSidebarToggle);
     };
   }, []);
+
+  // Listen for copy mode toggle
+  useEffect(() => {
+    const handleCopyModeToggle = (event) => {
+      if (event.detail && typeof event.detail.isCopyMode === 'boolean') {
+        setIsSelecting(event.detail.isCopyMode);
+        if (!event.detail.isCopyMode) {
+          setSelectedRows(new Set()); // Clear selections when copy mode is turned off
+        }
+      }
+    };
+    
+    window.addEventListener('copyModeToggle', handleCopyModeToggle);
+    return () => {
+      window.removeEventListener('copyModeToggle', handleCopyModeToggle);
+    };
+  }, []);
+
+  // Handle row selection
+  const handleRowClick = (index) => {
+    if (!isSelecting) return;
+    
+    setSelectedRows(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(index)) {
+        newSelected.delete(index);
+      } else {
+        newSelected.add(index);
+      }
+      return newSelected;
+    });
+  };
+
+  // Handle copying selected rows
+  useEffect(() => {
+    const handleCopy = () => {
+      if (selectedRows.size === 0) return;
+      
+      const selectedData = Array.from(selectedRows)
+        .map(index => sortedData[index])
+        .map(row => Object.values(row).join('\t'))
+        .join('\n');
+      
+      navigator.clipboard.writeText(selectedData);
+    };
+    
+    window.addEventListener('copySelectedRows', handleCopy);
+    return () => {
+      window.removeEventListener('copySelectedRows', handleCopy);
+    };
+  }, [selectedRows, sortedData]);
 
   // Fetch paginated data when fileId, currentPage, or pageSize changes
   useEffect(() => {
@@ -162,14 +260,6 @@ const DataTable = ({ data, fileId, onPageChange }) => {
     // Don't clear stats when hovering out to keep the sidebar visible
   };
 
-  // Filter data based on search query
-  const filteredData = paginatedData && Array.isArray(paginatedData) ? paginatedData.filter(row => {
-    if (!searchQuery) return true;
-    return Object.values(row).some(value => 
-      String(value).toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }) : [];
-
   // Early return with a more informative message
   if ((!data && !paginatedData) || (!Array.isArray(data) && !Array.isArray(paginatedData)) || (data && Array.isArray(data) && data.length === 0 && (!paginatedData || !Array.isArray(paginatedData) || paginatedData.length === 0))) {
     return (
@@ -220,43 +310,6 @@ const DataTable = ({ data, fileId, onPageChange }) => {
     }
     setSortConfig({ key, direction });
   };
-
-  const getSortedData = () => {
-    if (!sortConfig.key || !sortConfig.direction) return filteredData;
-
-    return [...filteredData].sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-
-      // Handle numeric values (including decimals)
-      const aNum = parseFloat(aValue);
-      const bNum = parseFloat(bValue);
-      if (!isNaN(aNum) && !isNaN(bNum)) {
-        return sortConfig.direction === 'asc' 
-          ? aNum - bNum
-          : bNum - aNum;
-      }
-
-      // Handle datetime values
-      const aDate = new Date(aValue);
-      const bDate = new Date(bValue);
-      if (!isNaN(aDate.getTime()) && !isNaN(bDate.getTime())) {
-        return sortConfig.direction === 'asc' 
-          ? aDate.getTime() - bDate.getTime()
-          : bDate.getTime() - aDate.getTime();
-      }
-
-      // Handle string values
-      const aString = String(aValue || '').toLowerCase();
-      const bString = String(bValue || '').toLowerCase();
-      
-      return sortConfig.direction === 'asc'
-        ? aString.localeCompare(bString)
-        : bString.localeCompare(aString);
-    });
-  };
-
-  const sortedData = getSortedData();
 
   // Pagination handlers
   const handlePageChange = (newPage) => {
@@ -644,17 +697,24 @@ const DataTable = ({ data, fileId, onPageChange }) => {
               {sortedData.map((row, index) => (
                 <tr 
                   key={index}
+                  onClick={() => handleRowClick(index)}
                   style={{
                     borderBottom: '1px solid var(--border-color)',
-                    cursor: 'pointer'
+                    cursor: isSelecting ? 'pointer' : 'default',
+                    backgroundColor: selectedRows.has(index) ? 'var(--primary-light)' : 'var(--white)',
+                    transition: 'background-color 0.2s ease'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--primary-dark)';
-                    e.currentTarget.style.color = 'var(--white)';
+                    if (!isSelecting) {
+                      e.currentTarget.style.backgroundColor = 'var(--border-color)';
+                      e.currentTarget.style.color = 'var(--text-dark)';
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--white)';
-                    e.currentTarget.style.color = 'var(--text-dark)';
+                    if (!isSelecting) {
+                      e.currentTarget.style.backgroundColor = selectedRows.has(index) ? 'var(--primary-light)' : 'var(--white)';
+                      e.currentTarget.style.color = 'var(--text-dark)';
+                    }
                   }}
                 >
                   {keys.map((key) => (

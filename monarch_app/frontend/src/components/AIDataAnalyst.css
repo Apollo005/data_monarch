@@ -415,85 +415,117 @@
 }
 
 .plot-container {
-  background: var(--white);
+  background: white;
   border-radius: 8px;
-  overflow: hidden;
-  margin: 1rem 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--border-color);
+  margin: 16px 0;
+  overflow: hidden;
 }
 
 .plot-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border-color);
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
 }
 
 .plot-title {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-dark);
+  font-weight: 600;
+  color: #374151;
 }
 
 .plot-controls {
   display: flex;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .plot-control-button {
   background: none;
   border: none;
-  color: var(--text-light);
-  cursor: pointer;
-  padding: 0.25rem;
+  padding: 6px;
   border-radius: 4px;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .plot-control-button:hover {
-  background: var(--background-light);
-  color: var(--primary-color);
+  background: #f3f4f6;
+  color: #374151;
 }
 
 .plot-content {
-  padding: 1rem;
+  padding: 16px;
   display: flex;
-  align-items: center;
   justify-content: center;
-  min-height: 300px;
-  background: var(--white);
-}
-
-.plot-content img {
-  max-width: 100%;
-  height: auto;
-  max-height: 500px;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  align-items: center;
+  min-height: 200px;
 }
 
 .plot-loading {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  background: var(--background-light);
-  color: var(--text-light);
-  font-size: 0.85rem;
-  min-height: 300px;
-  border-radius: 0 0 8px 8px;
+  gap: 12px;
+  padding: 32px;
+  color: #6b7280;
 }
 
-.plot-loading i {
-  font-size: 1rem;
-  color: var(--primary-color);
+.plot-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.plot-modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 1200px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.plot-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.plot-modal-close {
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: #6b7280;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.plot-modal-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.plot-modal-body {
+  padding: 16px;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .user .message-text {
@@ -531,6 +563,93 @@
   gap: 0.75rem;
   align-items: flex-end;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.input-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem;
+  border-right: 1px solid var(--border-color);
+}
+
+.format-dropdown,
+.analysis-dropdown {
+  position: relative;
+}
+
+.control-button {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 4px;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.control-button:hover {
+  background: var(--background-light);
+  color: var(--primary-color);
+}
+
+.dropdown-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: var(--white);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 0.5rem;
+  min-width: 160px;
+  z-index: 1000;
+  animation: dropdownFadeIn 0.2s ease;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--text-dark);
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background: var(--background-light);
+  color: var(--primary-color);
+}
+
+.dropdown-item.active {
+  background: var(--primary-color-light);
+  color: var(--primary-color);
+}
+
+.dropdown-item i {
+  width: 16px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .chat-input {

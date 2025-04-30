@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import config from "./config";
 
-const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
+const Sidebar = ({ onFileSelect, onLogout, onToggle, currentWorkspace }) => {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
@@ -18,7 +18,7 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
   const [newFileName, setNewFileName] = useState("");
 
   useEffect(() => {
-    const fetchFiles = async () => {
+    const fetchData = async () => {
       try {
         const token = localStorage.getItem("token");
         if (!token) {
@@ -37,23 +37,51 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
           document.documentElement.setAttribute('data-theme', 'dark');
         }
 
-        const res = await axios.get(`${config.baseUrl}/api/files`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          withCredentials: true,
-        });
-        setFiles(res.data);
+        // Fetch files for current workspace
+        if (currentWorkspace) {
+          await fetchWorkspaceFiles(currentWorkspace.id);
+        }
+
       } catch (err) {
-        setError("Could not load files. Please try again.");
+        setError("Could not load data. Please try again.");
         console.error(err);
       }
     };
 
-    fetchFiles();
-  }, []);
+    fetchData();
+
+    // Add event listener for file uploads
+    const handleFileUploaded = (event) => {
+      if (currentWorkspace && event.detail.workspaceId === currentWorkspace.id) {
+        fetchWorkspaceFiles(currentWorkspace.id);
+      }
+    };
+
+    window.addEventListener('fileUploaded', handleFileUploaded);
+
+    // Cleanup event listener
+    return () => {
+      window.removeEventListener('fileUploaded', handleFileUploaded);
+    };
+  }, [currentWorkspace]);
+
+  const fetchWorkspaceFiles = async (workspaceId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${config.baseUrl}/api/workspaces/${workspaceId}/files`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        withCredentials: true,
+      });
+      setFiles(response.data);
+    } catch (err) {
+      setError("Could not load files. Please try again.");
+      console.error(err);
+    }
+  };
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -72,14 +100,12 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
   };
 
   const handleNewUpload = () => {
-    // Reset the selected file
     setSelectedFile(null);
-    // Call onFileSelect with null to indicate a new upload
     onFileSelect(null);
   };
 
   const handleDeleteClick = (file, event) => {
-    event.stopPropagation(); // Prevent file selection when clicking delete
+    event.stopPropagation();
     setFileToDelete(file);
     setShowDeleteConfirm(true);
   };
@@ -96,10 +122,8 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
         withCredentials: true,
       });
 
-      // Remove the file from the local state
       setFiles(files.filter((f) => f.id !== fileToDelete.id));
 
-      // If the deleted file was selected, clear the selection
       if (selectedFile?.id === fileToDelete.id) {
         setSelectedFile(null);
         onFileSelect(null);
@@ -120,7 +144,6 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
 
   const handleSidebarToggle = () => {
     setIsCollapsed(!isCollapsed);
-    // Dispatch custom event for sidebar toggle
     const event = new CustomEvent('sidebarToggle', { 
       detail: { collapsed: !isCollapsed } 
     });
@@ -156,7 +179,6 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
         }
       );
 
-      // Update file in local state
       setFiles(files.map(f => 
         f.id === file.id ? { ...f, filename: newFileName } : f
       ));
@@ -172,7 +194,6 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
     setShowFileMenu(showFileMenu === fileId ? null : fileId);
   };
 
-  // Close file menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showFileMenu && !event.target.closest('.file-menu') && !event.target.closest('.file-menu-trigger')) {
@@ -200,13 +221,11 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
 
   const handleSettings = () => {
     setShowUserMenu(false);
-    // Placeholder for settings functionality
     console.log("Settings clicked");
   };
 
   const handleProfile = () => {
     setShowUserMenu(false);
-    // Placeholder for profile functionality
     console.log("Profile clicked");
   };
 
@@ -264,13 +283,15 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
         <i className={`fas fa-${isCollapsed ? 'chevron-right' : 'chevron-left'}`}></i>
       </button>
 
-      {/* Header section */}
+      {/* Files section */}
       <div style={{
+        flex: 1,
+        overflowY: "hidden",
         marginTop: "4rem",
         opacity: isCollapsed ? 0 : 1,
         transition: "opacity 0.3s ease",
         flexShrink: 0,
-        paddingBottom: "1rem",
+        paddingBottom: "2.5rem",
         borderBottom: "1px solid var(--border-color)"
       }}>
         <div style={{
@@ -313,93 +334,92 @@ const Sidebar = ({ onFileSelect, onLogout, onToggle }) => {
         </div>
       </div>
 
-      {/* Files list */}
-      <div style={{
-        flex: 1,
-        overflowY: "auto",
-        marginTop: "1rem",
-        opacity: isCollapsed ? 0 : 1,
-        transition: "opacity 0.3s ease",
-        pointerEvents: isCollapsed ? "none" : "auto",
-        visibility: isCollapsed ? "hidden" : "visible"
-      }}>
-        {error && (
-          <p style={{
-            color: "var(--error)",
-            fontSize: "0.875rem",
-            padding: "0.5rem",
-            margin: "0 0.5rem",
-            backgroundColor: "var(--error-light)",
-            borderRadius: "4px"
-          }}>
-            {error}
-          </p>
-        )}
-
-        {files.map((file) => (
-          <div
-            key={file.id}
-            onClick={() => handleFileClick(file)}
-            className={`file-item ${selectedFile?.id === file.id ? 'selected' : ''}`}
-          >
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              overflow: "hidden",
-              flex: 1
+        {/* Files list - moved up */}
+        <div style={{
+          overflowY: "auto",
+          opacity: isCollapsed ? 0 : 1,
+          transition: "opacity 0.3s ease",
+          pointerEvents: isCollapsed ? "none" : "auto",
+          visibility: isCollapsed ? "hidden" : "visible",
+          height: "100vh",
+        }}>
+          {error && (
+            <p style={{
+              color: "var(--error)",
+              fontSize: "0.875rem",
+              padding: "0.5rem",
+              margin: "0 0.5rem",
+              backgroundColor: "var(--error-light)",
+              borderRadius: "4px"
             }}>
-              <i className={`fas fa-${getFileIcon(file.file_type)}`} style={{ 
-                fontSize: "0.875rem",
-                color: selectedFile?.id === file.id ? "var(--primary-color)" : "var(--text-light)"
-              }}></i>
-              {isRenaming === file.id ? (
-                <form onSubmit={(e) => handleRenameSubmit(file, e)} style={{ flex: 1 }}>
-                  <input
-                    type="text"
-                    value={newFileName}
-                    onChange={(e) => setNewFileName(e.target.value)}
-                    onBlur={(e) => handleRenameSubmit(file, e)}
-                    autoFocus
-                    style={{
-                      width: "100%",
-                      padding: "0.25rem 0.5rem",
-                      border: "1px solid var(--primary-color)",
-                      borderRadius: "4px",
-                      fontSize: "0.875rem"
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </form>
-              ) : (
-                <span style={{
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis"
-                }}>
-                  {file.filename}
-                </span>
-              )}
-            </div>
-            
-            <div className="file-actions">
-              <button
-                className="file-menu-trigger"
-                onClick={(e) => handleFileMenuClick(file.id, e)}
-                style={{
-                  backgroundColor: "transparent",
-                  border: "none",
-                  color: "var(--text-light)",
-                  cursor: "pointer",
-                  padding: "0.25rem",
-                  borderRadius: "4px",
-                  display: "flex",
-                  alignItems: "center",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                <i className="fas fa-ellipsis-h"></i>
-              </button>
+              {error}
+            </p>
+          )}
+
+          {files.map((file) => (
+            <div
+              key={file.id}
+              onClick={() => handleFileClick(file)}
+              className={`file-item ${selectedFile?.id === file.id ? 'selected' : ''}`}
+            >
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                overflow: "hidden",
+                flex: 1
+              }}>
+                <i className={`fas fa-${getFileIcon(file.file_type)}`} style={{ 
+                  fontSize: "0.875rem",
+                  color: selectedFile?.id === file.id ? "var(--primary-color)" : "var(--text-light)"
+                }}></i>
+                {isRenaming === file.id ? (
+                  <form onSubmit={(e) => handleRenameSubmit(file, e)} style={{ flex: 1 }}>
+                    <input
+                      type="text"
+                      value={newFileName}
+                      onChange={(e) => setNewFileName(e.target.value)}
+                      onBlur={(e) => handleRenameSubmit(file, e)}
+                      autoFocus
+                      style={{
+                        width: "100%",
+                        padding: "0.25rem 0.5rem",
+                        border: "1px solid var(--primary-color)",
+                        borderRadius: "4px",
+                        fontSize: "0.875rem"
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </form>
+                ) : (
+                  <span style={{
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"
+                  }}>
+                    {file.filename}
+                  </span>
+                )}
+              </div>
+              
+              <div className="file-actions">
+                <button
+                  className="file-menu-trigger"
+                  onClick={(e) => handleFileMenuClick(file.id, e)}
+                  style={{
+                    backgroundColor: "transparent",
+                    border: "none",
+                    color: "var(--text-light)",
+                    cursor: "pointer",
+                    padding: "0.25rem",
+                    borderRadius: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <i className="fas fa-ellipsis-h"></i>
+                </button>
 
               {showFileMenu === file.id && (
                 <div className="file-menu">

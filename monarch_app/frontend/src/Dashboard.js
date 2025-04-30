@@ -9,6 +9,7 @@ import DataAnalysis from './components/DataAnalysis';
 import config from './config';
 import './styles/global.css';
 import 'font-awesome/css/font-awesome.min.css';
+import axios from 'axios';
 
 function Dashboard({ onLogout }) {
   const navigate = useNavigate();
@@ -34,6 +35,15 @@ function Dashboard({ onLogout }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [showSummarizeDropdown, setShowSummarizeDropdown] = useState(false);
+  const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
+  const [workspaces, setWorkspaces] = useState([]);
+  const [currentWorkspace, setCurrentWorkspace] = useState(null);
+  const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [workspaceToDelete, setWorkspaceToDelete] = useState(null);
+  const [showDeleteWorkspaceConfirm, setShowDeleteWorkspaceConfirm] = useState(false);
+  const [showManageWorkspaces, setShowManageWorkspaces] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(null);
 
   const handleLogout = () => {
     onLogout();
@@ -393,6 +403,11 @@ function Dashboard({ onLogout }) {
     setShowAddDropdown(false);
   };
 
+  const handleWorkspaceClick = (event) => {
+    event.stopPropagation();
+    setShowWorkspaceDropdown(!showWorkspaceDropdown);
+  };
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -405,6 +420,161 @@ function Dashboard({ onLogout }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showWorkspaceDropdown && !event.target.closest('.workspace-dropdown')) {
+        setShowWorkspaceDropdown(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showWorkspaceDropdown]);
+
+  // Add useEffect to fetch workspaces
+  useEffect(() => {
+    const fetchWorkspaces = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await axios.get(`${config.baseUrl}/api/workspaces`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          withCredentials: true,
+        });
+
+        setWorkspaces(response.data);
+        
+        // Set default workspace if none is selected
+        if (!currentWorkspace && response.data.length > 0) {
+          const defaultWorkspace = response.data.find(w => w.is_default) || response.data[0];
+          setCurrentWorkspace(defaultWorkspace);
+        }
+      } catch (err) {
+        console.error("Error fetching workspaces:", err);
+      }
+    };
+
+    fetchWorkspaces();
+  }, []);
+
+  const handleCreateWorkspace = async () => {
+    if (!newWorkspaceName.trim()) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.baseUrl}/api/workspaces`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ name: newWorkspaceName }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create workspace");
+      }
+
+      const newWorkspace = await response.json();
+      setWorkspaces([...workspaces, newWorkspace]);
+      setNewWorkspaceName("");
+      setShowCreateWorkspace(false);
+      setCurrentWorkspace(newWorkspace);
+      setSelectedFile(null);
+      setUploadedData(null);
+    } catch (error) {
+      console.error("Error creating workspace:", error);
+      setError("Failed to create workspace");
+    }
+  };
+
+  const handleDeleteWorkspace = async () => {
+    if (!workspaceToDelete) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.baseUrl}/api/workspaces/${workspaceToDelete.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete workspace");
+      }
+
+      setWorkspaces(workspaces.filter(w => w.id !== workspaceToDelete.id));
+      setWorkspaceToDelete(null);
+      setShowDeleteWorkspaceConfirm(false);
+
+      // Switch to default workspace if current workspace was deleted
+      if (currentWorkspace.id === workspaceToDelete.id) {
+        const defaultWorkspace = workspaces.find(w => w.is_default);
+        if (defaultWorkspace) {
+          setCurrentWorkspace(defaultWorkspace);
+          setSelectedFile(null);
+          setUploadedData(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting workspace:", error);
+      setError("Failed to delete workspace");
+    }
+  };
+
+  const handleRenameWorkspace = async (workspace) => {
+    if (!newWorkspaceName.trim() || newWorkspaceName === workspace.name) {
+      setIsRenaming(null);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.baseUrl}/api/workspaces/${workspace.id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ name: newWorkspaceName }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to rename workspace");
+      }
+
+      const updatedWorkspace = await response.json();
+      setWorkspaces(workspaces.map(w => 
+        w.id === workspace.id ? updatedWorkspace : w
+      ));
+      
+      if (currentWorkspace.id === workspace.id) {
+        setCurrentWorkspace(updatedWorkspace);
+      }
+      
+      setIsRenaming(null);
+      setNewWorkspaceName("");
+    } catch (error) {
+      console.error("Error renaming workspace:", error);
+      setError("Failed to rename workspace");
+    }
+  };
 
   const renderDataTable = () => {
     if (!uploadedData) return null;
@@ -495,7 +665,11 @@ function Dashboard({ onLogout }) {
       case 'upload':
         return (
           <div className="tab-content-container">
-            <FileUpload onDataUpload={handleDataUpload} existingData={uploadedData} />
+            <FileUpload 
+              onDataUpload={handleDataUpload} 
+              existingData={uploadedData} 
+              currentWorkspace={currentWorkspace}
+            />
           </div>
         );
       case 'filter':
@@ -882,6 +1056,7 @@ function Dashboard({ onLogout }) {
         onFileSelect={handleFileSelect} 
         onLogout={onLogout}
         onToggle={handleSidebarToggle}
+        currentWorkspace={currentWorkspace}
       />
       <div 
         className="dashboard-content"
@@ -908,20 +1083,78 @@ function Dashboard({ onLogout }) {
           {/* Left side - Dropdowns */}
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             {/* My Workspace Dropdown */}
-            <div className="dropdown" style={{ position: 'relative' }}>
-              <button style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: 'transparent',
-                border: 'none',
-                color: 'var(--text-dark)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.9rem'
-              }}>
-                My Workspace <i className="fas fa-chevron-down"></i>
+            <div className="workspace-dropdown" style={{ position: 'relative' }}>
+              <button 
+                onClick={handleWorkspaceClick}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-dark)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--primary-color)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--text-dark)';
+                }}
+              >
+                {currentWorkspace ? currentWorkspace.name : 'My Workspace'} <i className="fas fa-chevron-down"></i>
               </button>
+              {showWorkspaceDropdown && (
+                <div className="dropdown-menu" style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '0',
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                  padding: '0.5rem 0',
+                  minWidth: '200px',
+                  zIndex: 1000,
+                  height: '6rem',
+                  marginTop: '0.5rem',
+                  animation: 'dropdownFadeIn 0.2s ease'
+                }}>
+                  <button
+                    onClick={() => {
+                      setActiveTab('upload');
+                      setShowWorkspaceDropdown(false);
+                    }}
+                    className="dropdown-item"
+                  >
+                    <i className="fas fa-upload"></i>
+                    Upload New
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCreateWorkspace(true);
+                      setShowWorkspaceDropdown(false);
+                    }}
+                    className="dropdown-item"
+                  >
+                    <i className="fas fa-plus"></i>
+                    New Workspace
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowManageWorkspaces(true);
+                      setShowWorkspaceDropdown(false);
+                    }}
+                    className="dropdown-item"
+                  >
+                    <i className="fas fa-cog"></i>
+                    Manage Workspaces
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Quick Actions */}
@@ -956,6 +1189,7 @@ function Dashboard({ onLogout }) {
                     padding: '0.5rem 0',
                     minWidth: '150px',
                     zIndex: 1000,
+                    height: '12rem',
                     marginTop: '0.5rem'
                   }}>
                     <button className="dropdown-item" onClick={() => console.log('SUM clicked')}>
@@ -1064,6 +1298,257 @@ function Dashboard({ onLogout }) {
         {renderDeleteConfirm()}
 
         {renderOriginalDataPopup()}
+
+        {/* Create Workspace Modal */}
+        {showCreateWorkspace && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1001,
+          }}>
+            <div style={{
+              backgroundColor: 'var(--white)',
+              padding: '2rem',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+              maxWidth: '400px',
+              width: '90%'
+            }}>
+              <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Create New Workspace</h3>
+              <input
+                type="text"
+                value={newWorkspaceName}
+                onChange={(e) => setNewWorkspaceName(e.target.value)}
+                placeholder="Enter workspace name"
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  marginBottom: '1rem',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px'
+                }}
+              />
+              <div style={{
+                display: 'flex',
+                gap: '1rem',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={() => {
+                    setShowCreateWorkspace(false);
+                    setNewWorkspaceName("");
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: 'var(--white)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateWorkspace}
+                  disabled={!newWorkspaceName.trim()}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: 'var(--primary-color)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    color: 'var(--white)',
+                    opacity: !newWorkspaceName.trim() ? 0.5 : 1
+                  }}
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Workspace Confirmation Modal */}
+        {showDeleteWorkspaceConfirm && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1001
+          }}>
+            <div style={{
+              backgroundColor: 'var(--white)',
+              padding: '2rem',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+              maxWidth: '400px',
+              width: '90%'
+            }}>
+              <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>Delete Workspace</h3>
+              <p style={{ color: 'var(--text-dark)', marginBottom: '1.5rem' }}>
+                Are you sure you want to delete "{workspaceToDelete?.name}"? This action cannot be undone.
+              </p>
+              <div style={{
+                display: 'flex',
+                gap: '1rem',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={() => {
+                    setShowDeleteWorkspaceConfirm(false);
+                    setWorkspaceToDelete(null);
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: 'var(--white)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteWorkspace}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: 'var(--error)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    color: 'var(--white)'
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Manage Workspaces Modal */}
+        {showManageWorkspaces && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1001
+          }}>
+            <div style={{
+              backgroundColor: 'var(--white)',
+              padding: '2rem',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{ color: 'var(--text-dark)', margin: 0 }}>Manage Workspaces</h3>
+                <button
+                  onClick={() => setShowManageWorkspaces(false)}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-dark)',
+                    cursor: 'pointer',
+                    fontSize: '1.2rem'
+                  }}
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                {workspaces.map((workspace) => (
+                  <div
+                    key={workspace.id}
+                    style={{
+                      padding: '1rem',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      marginBottom: '0.5rem',
+                      backgroundColor: currentWorkspace?.id === workspace.id ? 'var(--primary-light)' : 'transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={() => {
+                      setCurrentWorkspace(workspace);
+                      setShowManageWorkspaces(false);
+                    }}
+                    onMouseEnter={(e) => {
+                      if (currentWorkspace?.id !== workspace.id) {
+                        e.currentTarget.style.backgroundColor = 'var(--background-light)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (currentWorkspace?.id !== workspace.id) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <i className="fas fa-folder" style={{
+                          color: currentWorkspace?.id === workspace.id ? 'var(--primary-color)' : 'var(--text-light)'
+                        }}></i>
+                        <span style={{
+                          color: currentWorkspace?.id === workspace.id ? 'var(--primary-color)' : 'var(--text-dark)'
+                        }}>
+                          {workspace.name}
+                        </span>
+                      </div>
+                      {workspace.is_default && (
+                        <span style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-light)',
+                          padding: '0.25rem 0.5rem',
+                          backgroundColor: 'var(--background-light)',
+                          borderRadius: '4px'
+                        }}>
+                          Default
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -20,7 +20,38 @@ def run_user_migrations():
             """))
             logger.info("Users table migration completed")
             
-            # Create files table
+            # Create workspaces table
+            connection.execute(text("""
+                CREATE TABLE IF NOT EXISTS workspaces (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    is_default BOOLEAN DEFAULT false,
+                    UNIQUE(user_id, name)
+                );
+            """))
+            logger.info("Workspaces table migration completed")
+            
+            # Add workspace_id column to files table if it doesn't exist
+            connection.execute(text("""
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'files' 
+                        AND column_name = 'workspace_id'
+                    ) THEN
+                        ALTER TABLE files 
+                        ADD COLUMN workspace_id INTEGER REFERENCES workspaces(id) ON DELETE CASCADE;
+                    END IF;
+                END $$;
+            """))
+            logger.info("Added workspace_id column to files table")
+            
+            # Create files table if it doesn't exist
             connection.execute(text("""
                 CREATE TABLE IF NOT EXISTS files (
                     id SERIAL PRIMARY KEY,
@@ -30,17 +61,54 @@ def run_user_migrations():
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                    UNIQUE(user_id, filename)
+                    workspace_id INTEGER REFERENCES workspaces(id) ON DELETE CASCADE,
+                    UNIQUE(user_id, filename, workspace_id)
                 );
             """))
             logger.info("Files table migration completed")
             
-            # Create index on files
+            # Create indexes
             connection.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_files_user_id 
                 ON files(user_id);
             """))
             logger.info("Files index created")
+            
+            connection.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_files_workspace_id 
+                ON files(workspace_id);
+            """))
+            logger.info("Workspace index created")
+            
+            # Create default workspace for existing users
+            connection.execute(text("""
+                INSERT INTO workspaces (name, user_id, is_default)
+                SELECT 'Default Workspace', id, true
+                FROM users u
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM workspaces w WHERE w.user_id = u.id
+                );
+            """))
+            logger.info("Default workspaces created for existing users")
+            
+            # Update existing files to use default workspace
+            connection.execute(text("""
+                UPDATE files f
+                SET workspace_id = w.id
+                FROM workspaces w
+                WHERE f.user_id = w.user_id
+                AND w.is_default = true
+                AND f.workspace_id IS NULL;
+            """))
+            logger.info("Existing files updated with default workspace")
+            
+            # Update updated_at column to have default value for existing records
+            connection.execute(text("""
+                UPDATE files
+                SET updated_at = CURRENT_TIMESTAMP
+                WHERE updated_at IS NULL;
+            """))
+            logger.info("Updated existing files with default updated_at value")
             
             connection.commit()
             logger.info("User database migrations completed successfully")

@@ -1,5 +1,5 @@
 from utils.imports import *
-from database.tables import User, File as DBFile, TableVersion
+from database.tables import User, File as DBFile, TableVersion, Workspace
 from routes.auth import get_current_user
 from database.files import engine as data_engine, DataSessionLocal
 from database.users import SessionLocal
@@ -32,6 +32,7 @@ def get_data_db():
 async def upload_file(
     file: UploadFile = File(...),
     column_names: Optional[str] = Form(None),
+    workspace_id: Optional[int] = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     data_db: Session = Depends(get_data_db)
@@ -40,6 +41,26 @@ async def upload_file(
     if file.filename.endswith(('.csv', '.xlsx', '.json', '.pdf', '.txt', '.jsonl')) :
         try:
             content_bytes = await file.read()
+
+            # If no workspace_id provided, get the default workspace
+            if not workspace_id:
+                default_workspace = db.query(Workspace).filter(
+                    Workspace.user_id == current_user.id,
+                    Workspace.is_default == True
+                ).first()
+                if default_workspace:
+                    workspace_id = default_workspace.id
+                else:
+                    raise HTTPException(status_code=400, detail="No workspace specified and no default workspace found")
+
+            # Verify workspace exists and belongs to user
+            workspace = db.query(Workspace).filter(
+                Workspace.id == workspace_id,
+                Workspace.user_id == current_user.id
+            ).first()
+            
+            if not workspace:
+                raise HTTPException(status_code=404, detail="Workspace not found")
 
             #check if the file is a csv data file
             if file.filename.endswith('.csv') :
@@ -196,7 +217,8 @@ async def upload_file(
                     filename=file.filename,
                     file_path=table_name,
                     file_type=file_type,
-                    user_id=current_user.id
+                    user_id=current_user.id,
+                    workspace_id=workspace_id
                 )
                 db.add(new_file)
                 db.commit()

@@ -3,7 +3,7 @@ import axios from "axios";
 import DataTable from "./DataTable";
 import config from './config';
 
-const FileUpload = ({ onDataUpload, existingData }) => {
+const FileUpload = ({ onDataUpload, existingData, currentWorkspace }) => {
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
   const [fileData, setFileData] = useState(existingData);
@@ -83,6 +83,11 @@ const FileUpload = ({ onDataUpload, existingData }) => {
       formData.append("column_names", columnNames);
     }
 
+    // Add workspace_id to formData if available
+    if (currentWorkspace && currentWorkspace.id) {
+      formData.append("workspace_id", currentWorkspace.id);
+    }
+
     try {
       const response = await axios.post(`${config.baseUrl}/api/data/upload/`, formData, {
         headers: { 
@@ -96,6 +101,12 @@ const FileUpload = ({ onDataUpload, existingData }) => {
       setFileData(data);
       onDataUpload(data);
       setMessage("Upload successful!");
+      
+      // Dispatch a custom event to notify about the new file
+      const event = new CustomEvent('fileUploaded', {
+        detail: { workspaceId: currentWorkspace?.id }
+      });
+      window.dispatchEvent(event);
     } catch (error) {
       if (error.response?.status === 401) {
         setMessage("Session expired. Please log in again.");

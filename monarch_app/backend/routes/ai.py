@@ -173,15 +173,25 @@ async def analyze_request(
     db: Session = Depends(get_db)
 ):
     try:
-        # Get the user's current file
+        # Get the file ID from the request
+        file_id = request.get("fileId")
+        if not file_id:
+            raise HTTPException(
+                status_code=400,
+                detail="No file ID provided"
+            )
+
+        # Get the specified file
         current_file = db.query(File).filter(
+            File.id == file_id,
             File.user_id == current_user.id
-        ).order_by(File.updated_at.desc()).first()
+        ).first()
 
         if not current_file:
-            return {
-                "response": "Please upload a file first before asking for analysis."
-            }
+            raise HTTPException(
+                status_code=404,
+                detail="File not found"
+            )
 
         # Get the data from the current file
         df = get_current_file_data(current_file.file_path)
@@ -238,7 +248,7 @@ ALLOWED_FUNCTIONS = {
     # Numpy functions
     'np.array', 'np.zeros', 'np.ones', 'np.linspace', 'np.arange', 'np.random',
     'np.mean', 'np.median', 'np.std', 'np.var', 'np.corrcoef', 'np.polyfit',
-    'np.percentile', 'np.quantile', 'np.histogram', 'np.unique', 'np.sort',
+    'np.percentile', 'np.quantile', 'np.histogram', 'np.unique', 'np.sort', 'np.fft.fft', 'np.fft.fftfreq', 'np.abs',
     
     # Statistics functions
     'statistics.mean', 'statistics.median', 'statistics.mode', 'statistics.stdev',
@@ -288,7 +298,7 @@ def validate_code(code: str) -> bool:
                         func_name = f"{node.func.value.id}.{node.func.attr}"
                         if func_name not in ALLOWED_FUNCTIONS:
                             # Allow any matplotlib/seaborn/plotly function calls
-                            if not any(func_name.startswith(prefix) for prefix in ['plt.', 'sns.', 'go.', 'plotly.']):
+                            if not any(func_name.startswith(prefix) for prefix in ['plt.', 'sns.', 'go.', 'plotly.','pd.','df.']):
                                 return False
                 
                 # Check for dangerous built-in functions

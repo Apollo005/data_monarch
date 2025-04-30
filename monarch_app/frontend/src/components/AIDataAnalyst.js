@@ -19,6 +19,8 @@ const AIDataAnalyst = ({ onLogout }) => {
   const [analysisType, setAnalysisType] = useState('general');
   const [executedPlots, setExecutedPlots] = useState({});
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showFormatDropdown, setShowFormatDropdown] = useState(false);
+  const [showAnalysisDropdown, setShowAnalysisDropdown] = useState(false);
 
   useEffect(() => {
     if (location.state?.currentFile) {
@@ -67,10 +69,57 @@ const AIDataAnalyst = ({ onLogout }) => {
                     <div className="plot-header">
                       <span className="plot-title">Generated Plot</span>
                       <div className="plot-controls">
-                        <button className="plot-control-button" title="Download Plot">
+                        <button 
+                          className="plot-control-button" 
+                          title="Download Plot"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = `data:image/png;base64,${executedPlots[index].data}`;
+                            link.download = `plot_${new Date().getTime()}.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                        >
                           <i className="fas fa-download"></i>
                         </button>
-                        <button className="plot-control-button" title="Fullscreen">
+                        <button 
+                          className="plot-control-button" 
+                          title="Enlarge Plot"
+                          onClick={() => {
+                            const modal = document.createElement('div');
+                            modal.className = 'plot-modal';
+                            modal.innerHTML = `
+                              <div class="plot-modal-content">
+                                <div class="plot-modal-header">
+                                  <span>Plot Preview</span>
+                                  <button class="plot-modal-close">
+                                    <i class="fas fa-times"></i>
+                                  </button>
+                                </div>
+                                <div class="plot-modal-body">
+                                  <img 
+                                    src="data:image/png;base64,${executedPlots[index].data}"
+                                    alt="Enlarged plot"
+                                    style="width: 100%; height: auto;"
+                                  />
+                                </div>
+                              </div>
+                            `;
+                            document.body.appendChild(modal);
+                            
+                            const closeButton = modal.querySelector('.plot-modal-close');
+                            closeButton.onclick = () => {
+                              document.body.removeChild(modal);
+                            };
+                            
+                            modal.onclick = (e) => {
+                              if (e.target === modal) {
+                                document.body.removeChild(modal);
+                              }
+                            };
+                          }}
+                        >
                           <i className="fas fa-expand"></i>
                         </button>
                       </div>
@@ -113,10 +162,57 @@ const AIDataAnalyst = ({ onLogout }) => {
                   <div className="plot-header">
                     <span className="plot-title">Generated Plot</span>
                     <div className="plot-controls">
-                      <button className="plot-control-button" title="Download Plot">
+                      <button 
+                        className="plot-control-button" 
+                        title="Download Plot"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = `data:image/png;base64,${executedPlots[index].data}`;
+                          link.download = `plot_${new Date().getTime()}.png`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                      >
                         <i className="fas fa-download"></i>
                       </button>
-                      <button className="plot-control-button" title="Fullscreen">
+                      <button 
+                        className="plot-control-button" 
+                        title="Enlarge Plot"
+                        onClick={() => {
+                          const modal = document.createElement('div');
+                          modal.className = 'plot-modal';
+                          modal.innerHTML = `
+                            <div class="plot-modal-content">
+                              <div class="plot-modal-header">
+                                <span>Plot Preview</span>
+                                <button class="plot-modal-close">
+                                  <i class="fas fa-times"></i>
+                                </button>
+                              </div>
+                              <div class="plot-modal-body">
+                                <img 
+                                  src="data:image/png;base64,${executedPlots[index].data}"
+                                  alt="Enlarged plot"
+                                  style="width: 100%; height: auto;"
+                                />
+                              </div>
+                            </div>
+                          `;
+                          document.body.appendChild(modal);
+                          
+                          const closeButton = modal.querySelector('.plot-modal-close');
+                          closeButton.onclick = () => {
+                            document.body.removeChild(modal);
+                          };
+                          
+                          modal.onclick = (e) => {
+                            if (e.target === modal) {
+                              document.body.removeChild(modal);
+                            }
+                          };
+                        }}
+                      >
                         <i className="fas fa-expand"></i>
                       </button>
                     </div>
@@ -331,31 +427,7 @@ const AIDataAnalyst = ({ onLogout }) => {
         </div>
 
         <div className="chat-interface">
-          <div className="analysis-controls">
-            <div className="format-selector">
-              <label>Output Format:</label>
-              <select 
-                value={outputFormat} 
-                onChange={(e) => setOutputFormat(e.target.value)}
-                className="format-select"
-              >
-                <option value="paragraph">Paragraph</option>
-                <option value="bullet">Bullet Points</option>
-              </select>
-            </div>
-            <div className="analysis-type-selector">
-              <label>Analysis Type:</label>
-              <select 
-                value={analysisType} 
-                onChange={(e) => setAnalysisType(e.target.value)}
-                className="analysis-type-select"
-              >
-                <option value="general">General Analysis</option>
-                <option value="summary">Summary</option>
-                <option value="report">Detailed Report</option>
-              </select>
-            </div>
-          </div>
+          
 
           <div className="chat-container" ref={chatContainerRef}>
             {!currentFile && (
@@ -416,6 +488,84 @@ const AIDataAnalyst = ({ onLogout }) => {
           </div>
 
           <div className="input-container">
+            <div className="input-controls">
+              <div className="format-dropdown">
+                <button 
+                  className="control-button"
+                  onClick={() => setShowFormatDropdown(!showFormatDropdown)}
+                  title="Output Format"
+                >
+                  <i className="fas fa-paragraph"></i>
+                </button>
+                {showFormatDropdown && (
+                  <div className="dropdown-menu">
+                    <button 
+                      className={`dropdown-item ${outputFormat === 'paragraph' ? 'active' : ''}`}
+                      onClick={() => {
+                        setOutputFormat('paragraph');
+                        setShowFormatDropdown(false);
+                      }}
+                    >
+                      <i className="fas fa-paragraph"></i>
+                      Paragraph
+                    </button>
+                    <button 
+                      className={`dropdown-item ${outputFormat === 'bullet' ? 'active' : ''}`}
+                      onClick={() => {
+                        setOutputFormat('bullet');
+                        setShowFormatDropdown(false);
+                      }}
+                    >
+                      <i className="fas fa-list-ul"></i>
+                      Bullet Points
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="analysis-dropdown">
+                <button 
+                  className="control-button"
+                  onClick={() => setShowAnalysisDropdown(!showAnalysisDropdown)}
+                  title="Analysis Type"
+                >
+                  <i className="fas fa-chart-line"></i>
+                </button>
+                {showAnalysisDropdown && (
+                  <div className="dropdown-menu">
+                    <button 
+                      className={`dropdown-item ${analysisType === 'general' ? 'active' : ''}`}
+                      onClick={() => {
+                        setAnalysisType('general');
+                        setShowAnalysisDropdown(false);
+                      }}
+                    >
+                      <i className="fas fa-chart-line"></i>
+                      General Analysis
+                    </button>
+                    <button 
+                      className={`dropdown-item ${analysisType === 'summary' ? 'active' : ''}`}
+                      onClick={() => {
+                        setAnalysisType('summary');
+                        setShowAnalysisDropdown(false);
+                      }}
+                    >
+                      <i className="fas fa-file-alt"></i>
+                      Summary
+                    </button>
+                    <button 
+                      className={`dropdown-item ${analysisType === 'report' ? 'active' : ''}`}
+                      onClick={() => {
+                        setAnalysisType('report');
+                        setShowAnalysisDropdown(false);
+                      }}
+                    >
+                      <i className="fas fa-file-medical"></i>
+                      Detailed Report
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
             <textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
