@@ -40,6 +40,9 @@ class FileResponse(BaseModel):
         }
     )
 
+class FileRenameRequest(BaseModel):
+    filename: str
+
 @router.get("/api/files", response_model=List[FileResponse])
 async def get_user_files(
     current_user: User = Depends(get_current_user),
@@ -80,6 +83,55 @@ async def get_file(
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching file: {str(e)}"
+        )
+
+@router.patch("/api/files/{file_id}")
+async def rename_file(
+    file_id: int,
+    request: FileRenameRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Rename a specific file (if owned by the current user)"""
+    try:
+        # Check if file exists and belongs to user
+        file = db.query(File).filter(
+            File.id == file_id,
+            File.user_id == current_user.id
+        ).first()
+        
+        if not file:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Check if a file with the new name already exists for this user
+        existing_file = db.query(File).filter(
+            File.user_id == current_user.id,
+            File.filename == request.filename,
+            File.id != file_id
+        ).first()
+        
+        if existing_file:
+            raise HTTPException(
+                status_code=400,
+                detail="A file with this name already exists"
+            )
+        
+        # Update the filename
+        file.filename = request.filename
+        file.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(file)
+        
+        return FileResponse.model_validate(file)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error renaming file: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error renaming file: {str(e)}"
         )
 
 @router.delete("/api/files/{file_id}")

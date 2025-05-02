@@ -6,6 +6,33 @@ import './AIDataAnalyst.css';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import Plot from 'react-plotly.js';
+import axios from 'axios';
+
+const TypeWriter = ({ text, speed = 10 }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    if (currentIndex < text.length) {
+      const timer = setTimeout(() => {
+        setDisplayedText(prev => prev + text[currentIndex]);
+        setCurrentIndex(prev => prev + 1);
+      }, speed);
+
+      return () => clearTimeout(timer);
+    } else {
+      setIsComplete(true);
+    }
+  }, [currentIndex, text, speed]);
+
+  return (
+    <div className={`typewriter-text ${isComplete ? 'complete' : ''}`}>
+      {displayedText}
+      {!isComplete && <span className="cursor"></span>}
+    </div>
+  );
+};
 
 const AIDataAnalyst = ({ onLogout }) => {
   const navigate = useNavigate();
@@ -21,6 +48,21 @@ const AIDataAnalyst = ({ onLogout }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showFormatDropdown, setShowFormatDropdown] = useState(false);
   const [showAnalysisDropdown, setShowAnalysisDropdown] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [username, setUsername] = useState('');
+
+  useEffect(() => {
+    // Get username from JWT token
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+        setUsername(tokenPayload.sub);
+      } catch (error) {
+        console.error('Error parsing token:', error);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (location.state?.currentFile) {
@@ -41,6 +83,22 @@ const AIDataAnalyst = ({ onLogout }) => {
     }
   }, [messages]);
 
+  const handleLogout = () => {
+    onLogout();
+    setShowUserMenu(false);
+    navigate('/login');
+  };
+
+  const handleSettings = () => {
+    setShowUserMenu(false);
+    console.log("Settings clicked");
+  };
+
+  const handleProfile = () => {
+    setShowUserMenu(false);
+    console.log("Profile clicked");
+  };
+
   const formatResponse = (content) => {
     if (content.includes('```')) {
       return content.split('```').map((part, index) => {
@@ -48,11 +106,11 @@ const AIDataAnalyst = ({ onLogout }) => {
           const [language, ...codeLines] = part.split('\n');
           const code = codeLines.join('\n').trim();
           
-          if (language.trim() === 'plot') {
-            return (
-              <div key={index} className="code-block">
+          return (
+            <div key={index} className="code-block-container">
+              <div className="code-block">
                 <div className="code-header">
-                  <span className="code-language">Python</span>
+                  <span className="code-language">{language.trim()}</span>
                   <button 
                     className="run-code-button"
                     onClick={() => executeCode(code, index)}
@@ -64,103 +122,15 @@ const AIDataAnalyst = ({ onLogout }) => {
                 <SyntaxHighlighter language="python" style={vscDarkPlus}>
                   {code}
                 </SyntaxHighlighter>
-                {executedPlots[index] ? (
-                  <div className="plot-container">
-                    <div className="plot-header">
-                      <span className="plot-title">Generated Plot</span>
-                      <div className="plot-controls">
-                        <button 
-                          className="plot-control-button" 
-                          title="Download Plot"
-                          onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = `data:image/png;base64,${executedPlots[index].data}`;
-                            link.download = `plot_${new Date().getTime()}.png`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                          }}
-                        >
-                          <i className="fas fa-download"></i>
-                        </button>
-                        <button 
-                          className="plot-control-button" 
-                          title="Enlarge Plot"
-                          onClick={() => {
-                            const modal = document.createElement('div');
-                            modal.className = 'plot-modal';
-                            modal.innerHTML = `
-                              <div class="plot-modal-content">
-                                <div class="plot-modal-header">
-                                  <span>Plot Preview</span>
-                                  <button class="plot-modal-close">
-                                    <i class="fas fa-times"></i>
-                                  </button>
-                                </div>
-                                <div class="plot-modal-body">
-                                  <img 
-                                    src="data:image/png;base64,${executedPlots[index].data}"
-                                    alt="Enlarged plot"
-                                    style="width: 100%; height: auto;"
-                                  />
-                                </div>
-                              </div>
-                            `;
-                            document.body.appendChild(modal);
-                            
-                            const closeButton = modal.querySelector('.plot-modal-close');
-                            closeButton.onclick = () => {
-                              document.body.removeChild(modal);
-                            };
-                            
-                            modal.onclick = (e) => {
-                              if (e.target === modal) {
-                                document.body.removeChild(modal);
-                              }
-                            };
-                          }}
-                        >
-                          <i className="fas fa-expand"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="plot-content">
-                      <img 
-                        src={`data:image/png;base64,${executedPlots[index].data}`}
-                        alt="Generated plot"
-                        style={{ width: '100%', height: 'auto', maxHeight: '500px' }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="plot-loading">
-                    <i className="fas fa-spinner fa-spin"></i>
-                    <span>Click "Run Code" to generate plot</span>
-                  </div>
-                )}
               </div>
-            );
-          }
-          
-          return (
-            <div key={index} className="code-block">
-              <div className="code-header">
-                <span className="code-language">{language.trim()}</span>
-                <button 
-                  className="run-code-button"
-                  onClick={() => executeCode(code, index)}
-                >
-                  <i className="fas fa-play"></i>
-                  Run Code
-                </button>
-              </div>
-              <SyntaxHighlighter language={language.trim()} style={vscDarkPlus}>
-                {code}
-              </SyntaxHighlighter>
               {executedPlots[index] && (
                 <div className="plot-container">
-                  <div className="plot-header">
-                    <span className="plot-title">Generated Plot</span>
+                  <div className="plot-content">
+                    <img 
+                      src={`data:image/png;base64,${executedPlots[index].data}`}
+                      alt="Generated plot"
+                      style={{ width: '100%', height: 'auto', maxHeight: '500px', borderRadius: '8px' }}
+                    />
                     <div className="plot-controls">
                       <button 
                         className="plot-control-button" 
@@ -194,7 +164,7 @@ const AIDataAnalyst = ({ onLogout }) => {
                                 <img 
                                   src="data:image/png;base64,${executedPlots[index].data}"
                                   alt="Enlarged plot"
-                                  style="width: 100%; height: auto;"
+                                  style="width: 100%; height: auto; max-height: 80vh;"
                                 />
                               </div>
                             </div>
@@ -217,43 +187,29 @@ const AIDataAnalyst = ({ onLogout }) => {
                       </button>
                     </div>
                   </div>
-                  <div className="plot-content">
-                    <img 
-                      src={`data:image/png;base64,${executedPlots[index].data}`}
-                      alt="Generated plot"
-                      style={{ width: '100%', height: 'auto', maxHeight: '500px' }}
-                    />
-                  </div>
+                  {executedPlots[index].text && (
+                    <div className="code-output">
+                      <div className="output-header">
+                        <i className="fas fa-terminal"></i>
+                        Output
+                      </div>
+                      <pre>{executedPlots[index].text}</pre>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           );
         }
-        return formatText(part);
+        return <TypeWriter key={index} text={part} />;
       });
     }
-    return formatText(content);
-  };
-
-  const formatText = (text) => {
-    // Split by newlines and format each line
-    return text.split('\n').map((line, index) => {
-      // Check for bullet points
-      if (line.trim().startsWith('- ')) {
-        return <li key={index}>{line.substring(2)}</li>;
-      }
-      // Check for numbered lists
-      if (/^\d+\.\s/.test(line.trim())) {
-        return <li key={index}>{line.substring(line.indexOf('.') + 2)}</li>;
-      }
-      // Regular paragraph
-      return <p key={index}>{line}</p>;
-    });
+    return <TypeWriter text={content} />;
   };
 
   const executeCode = async (code, index) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const response = await fetch(`${config.baseUrl}/api/ai/execute-code`, {
         method: 'POST',
         headers: {
@@ -262,7 +218,8 @@ const AIDataAnalyst = ({ onLogout }) => {
         },
         body: JSON.stringify({ 
           code,
-          fileId: currentFile?.id
+          fileId: currentFile?.id,
+          data: window.currentAnalysisData // Pass the stored data
         })
       });
 
@@ -272,16 +229,21 @@ const AIDataAnalyst = ({ onLogout }) => {
       }
 
       const data = await response.json();
-      if (data.result && data.result.plot) {
+      if (data.type === "plot") {
         setExecutedPlots(prev => ({
           ...prev,
-          [index]: data.result.plot
+          [index]: data
         }));
-      } else if (data.result && data.result.text) {
-        // Handle text output
+      } else if (data.type === "text") {
         setMessages(prev => [...prev, {
           type: 'system',
-          content: data.result.text,
+          content: data.result,
+          timestamp: new Date().toISOString()
+        }]);
+      } else if (data.type === "error") {
+        setMessages(prev => [...prev, {
+          type: 'error',
+          content: `Error executing code: ${data.error}\n${data.trace || ''}`,
           timestamp: new Date().toISOString()
         }]);
       }
@@ -341,13 +303,20 @@ const AIDataAnalyst = ({ onLogout }) => {
 
       const data = await response.json();
       
+      // Create AI message with file info if available
       const aiMessage = {
         type: 'ai',
         content: data.response,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        fileInfo: data.file_info // Add file info to message
       };
 
       setMessages(prev => [...prev, aiMessage]);
+
+      // Store the data for use in code execution
+      if (data.data) {
+        window.currentAnalysisData = data.data;
+      }
 
       // Automatically execute any code blocks in the response
       const codeBlocks = data.response.match(/```[\s\S]*?```/g) || [];
@@ -358,7 +327,7 @@ const AIDataAnalyst = ({ onLogout }) => {
         const [language, ...codeLines] = codeBlock.replace(/```/g, '').split('\n');
         const code = codeLines.join('\n').trim();
         
-        if (language.trim() === 'plot') {
+        if (language.trim() === 'plot' || language.trim() === 'python') {
           await executeCode(code, i);
         }
       }
@@ -383,6 +352,229 @@ const AIDataAnalyst = ({ onLogout }) => {
     }
   };
 
+  // Add these styles
+  const styles = `
+    .chat-interface {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 64px);
+      background: var(--background-light);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .chat-container {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 2rem;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      margin-bottom: 2rem;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: messageSlideIn 0.3s ease forwards;
+    }
+
+    @keyframes messageSlideIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message-content {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .ai-avatar, .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .ai-avatar {
+      background: var(--primary-color);
+      color: var(--white);
+    }
+
+    .user-avatar {
+      background: var(--background-dark);
+      color: var(--white);
+    }
+
+    .message-text {
+      flex-grow: 1;
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .user .message-text {
+      background: var(--primary-color);
+      color: var(--white);
+    }
+
+    .message-timestamp {
+      font-size: 0.75rem;
+      color: var(--text-light);
+      margin-top: 0.5rem;
+      text-align: right;
+    }
+
+    .input-container {
+      padding: 1.5rem;
+      background: var(--card-bg);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      gap: 1rem;
+      align-items: flex-end;
+    }
+
+    .chat-input {
+      flex-grow: 1;
+      padding: 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--background-light);
+      resize: none;
+      min-height: 60px;
+      max-height: 150px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      transition: all 0.2s ease;
+    }
+
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 2px var(--primary-color-light);
+    }
+
+    .send-button, .stop-button {
+      padding: 1rem;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary-color);
+      color: var(--white);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+
+    .stop-button {
+      background: var(--error);
+    }
+
+    .send-button:hover {
+      background: var(--primary-color-dark);
+      transform: translateY(-2px);
+    }
+
+    .stop-button:hover {
+      background: var(--error-dark);
+      transform: translateY(-2px);
+    }
+
+    .typewriter-text {
+      position: relative;
+      white-space: pre-wrap;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.2em;
+      background: currentColor;
+      margin-left: 2px;
+      animation: cursor-blink 1s step-end infinite;
+    }
+
+    @keyframes cursor-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .code-block-container {
+      margin: 1.5rem 0;
+      opacity: 0;
+      transform: translateY(10px);
+      animation: codeBlockSlideIn 0.3s ease forwards;
+    }
+
+    @keyframes codeBlockSlideIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .welcome-message {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-light);
+    }
+
+    .welcome-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .welcome-header i {
+      font-size: 3rem;
+      color: var(--primary-color);
+    }
+
+    .welcome-header h2 {
+      font-size: 1.5rem;
+      color: var(--text-dark);
+      margin: 0;
+    }
+
+    .return-button {
+      margin-top: 2rem;
+      padding: 0.75rem 1.5rem;
+      background: var(--primary-color);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .return-button:hover {
+      background: var(--primary-color-dark);
+      transform: translateY(-2px);
+    }
+  `;
+
+  // Add the styles to the document
+  useEffect(() => {
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = styles;
+    document.head.appendChild(styleSheet);
+    return () => {
+      document.head.removeChild(styleSheet);
+    };
+  }, []);
+
   return (
     <div className="ai-analyst-new">
       <div className="ai-sidebar">
@@ -399,6 +591,116 @@ const AIDataAnalyst = ({ onLogout }) => {
             <i className="fas fa-ellipsis-h"></i>
             <span>Other</span>
           </button>
+        </div>
+        {/* User Section */}
+        <div className="sidebar-user-section">
+          <button
+            className="user-profile-trigger"
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            style={{
+              width: "100%",
+              padding: "0.5rem",
+              backgroundColor: "transparent",
+              border: "1px solid var(--border-color)",
+              borderRadius: "6px",
+              color: "var(--text-dark)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+              fontSize: "0.875rem",
+              transition: "all 0.2s ease"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "var(--background-light)";
+              e.currentTarget.style.borderColor = "var(--primary-color)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.borderColor = "var(--border-color)";
+            }}
+          >
+            <i className="fas fa-user-circle"></i>
+            <span>{username || "User"}</span>
+            <i className="fas fa-chevron-down" style={{ marginLeft: "auto", fontSize: "0.75rem" }}></i>
+          </button>
+
+          {showUserMenu && (
+            <div className="user-menu" style={{
+              position: "absolute",
+              bottom: "100%",
+              left: "0.5rem",
+              right: "0.5rem",
+              backgroundColor: "var(--white)",
+              borderRadius: "6px",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+              padding: "0.5rem",
+              zIndex: 1000,
+              marginBottom: "0.5rem",
+              animation: "menuFadeIn 0.2s ease"
+            }}>
+              <div style={{
+                padding: "0.5rem",
+                borderBottom: "1px solid var(--border-color)",
+                marginBottom: "0.5rem"
+              }}>
+                <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{username || "User"}</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-light)" }}>Signed in</div>
+              </div>
+              
+              <button
+                className="file-menu-item"
+                onClick={handleProfile}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "0.5rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem"
+                }}
+              >
+                <i className="fas fa-user"></i>
+                Profile
+              </button>
+              
+              <button
+                className="file-menu-item"
+                onClick={handleSettings}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "0.5rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem"
+                }}
+              >
+                <i className="fas fa-cog"></i>
+                Settings
+              </button>
+              
+              <div style={{ height: "1px", background: "var(--border-color)", margin: "0.5rem 0" }}></div>
+              
+              <button 
+                className="file-menu-item"
+                onClick={handleLogout}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "0.5rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  color: "var(--error)"
+                }}
+              >
+                <i className="fas fa-sign-out-alt"></i>
+                Logout
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -420,15 +722,10 @@ const AIDataAnalyst = ({ onLogout }) => {
                 {currentFile.filename}
               </div>
             )}
-            <div className="user-profile">
-              <i className="fas fa-user-circle"></i>
-            </div>
           </div>
         </div>
 
         <div className="chat-interface">
-          
-
           <div className="chat-container" ref={chatContainerRef}>
             {!currentFile && (
               <div className="welcome-message">
